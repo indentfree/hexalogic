@@ -343,6 +343,10 @@ class HexGridGame {
     
     // Méthode simplifiée pour afficher le tooltip
     showSimpleTooltip(e, hex) {
+        if (this.mode === 'game') {
+            this.hideTooltip();
+            return;
+        }
         const tooltip = this.hexTooltip;
         if (!tooltip) return;
         tooltip.style.display = 'block';
