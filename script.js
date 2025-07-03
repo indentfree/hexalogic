@@ -266,6 +266,12 @@ class HexGridGame {
             const cy = parseFloat(hex.dataset.cy);
             if (hex.dataset.type === 'game') {
                 this.addSimpleCellEvents(hex);
+                // Ajout : en mode GAME, un clic sur une cellule de jeu désactive la mise en évidence
+                if (this.mode === 'game') {
+                    hex.addEventListener('click', () => {
+                        this.clearNeighborHighlight();
+                    });
+                }
             } else if (hex.dataset.type === 'constraint' || hex.dataset.type === 'useless') {
                 if (hex.dataset.type === 'constraint') {
                     // Affichage principal :
@@ -286,6 +292,16 @@ class HexGridGame {
                         valueText.textContent = hex.dataset.actual_black || hex.dataset.currentValue || '0';
                     }
                     this.hexGridSvg.appendChild(valueText);
+                }
+                // Ajout : en mode GAME, clic sur contrainte = highlight
+                if (this.mode === 'game' && hex.dataset.type === 'constraint') {
+                    hex.addEventListener('click', () => {
+                        if (hex.dataset.constraintId) {
+                            const type = hex.dataset.constraintId[0];
+                            const val = parseInt(hex.dataset.constraintId.slice(1));
+                            this.highlightGameCellsByConstraint(type, val);
+                        }
+                    });
                 }
                 hex.addEventListener('mouseenter', (e) => {
                     this.showSimpleTooltip(e, hex);
