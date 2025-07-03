@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeu Grille Hexadécimale</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#667eea">
+</head>
+<body>
+    <button id="toggleModeBtn">Mode: Edit</button>
+    <select id="gridSelector" style="display:none;"></select>
+    <div style="display: flex; align-items: flex-start; gap: 24px;">
+        <div id="hexGridContainer">
+            <div class="container">
+                <header>
+                    <h1>Jeu Grille Hexadécimale</h1>
+                    <div class="controls">
+                        <div class="control-group">
+                            <label for="gridSize">Taille de la grille:</label>
+                            <input type="number" id="gridSize" min="2" max="20" value="4">
+                        </div>
+                        <div class="control-group">
+                            <label for="hexSize">Taille des hexagones:</label>
+                            <input type="number" id="hexSize" min="20" max="100" value="40">
+                        </div>
+                        <button id="generateGrid">Générer Grille</button>
+                        <button id="clearGrid">Effacer</button>
+                    </div>
+                </header>
+                
+                <main>
+                    <div class="game-info">
+                        <!-- Les info-item ont été supprimés -->
+                    </div>
+                    
+                    <div class="grid-container">
+                        <svg id="hexGridSvg"></svg>
+                    </div>
+                    <textarea id="yamlExport" rows="30" cols="40" readonly style="font-family: monospace; font-size: 1em;"></textarea>
+
+                </main>
+            </div>
+        </div>
+    </div>
+    
+    <script src="configuration.js"></script>
+    <script src="script.js"></script>
+    <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./service-worker.js');
+    }
+    </script>
+</body>
+<div id="hexTooltip"></div>
+</html> 
