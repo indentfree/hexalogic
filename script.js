@@ -14,12 +14,7 @@ class HexGridGame {
         this.grid = [];
         this.mode = 'game'; // Forcer le mode par défaut à GAME
         this.bindEvents();
-        // Charger la première grille de la configuration si disponible
-        if (window.GRIDS_DEFINITION && window.GRIDS_DEFINITION.length > 0) {
-            this.loadGridFromConf(window.GRIDS_DEFINITION[0]);
-        } else {
-            this.generateGrid();
-        }
+        // NE PAS générer la grille ici, attendre window.onload
         this.bindModeToggle();
         this.updateYamlExport();
         this.setYamlExportVisibility();
@@ -63,6 +58,7 @@ class HexGridGame {
         this.clearGrid();
         const svg = this.hexGridSvg;
         svg.innerHTML = '';
+        // Synchroniser la largeur du SVG avec celle de son parent
         svg.style.width = '100%';
         svg.style.height = 'auto';
         // On attend le layout pour avoir la largeur réelle du SVG
@@ -75,8 +71,10 @@ class HexGridGame {
             this.hexSize = hexSize;
             const w = this.hexSize;
             const h = Math.sqrt(3) / 2 * w;
-            const margeLeft = Math.floor((svgWidth - (maxHexes * hexSize)) / 2);
-            const margeRight = Math.ceil((svgWidth - (maxHexes * hexSize)) / 2);
+            let margeLeft = Math.floor((svgWidth - (maxHexes * hexSize)) / 2);
+            let margeRight = Math.ceil((svgWidth - (maxHexes * hexSize)) / 2);
+            margeLeft = Math.max(0, margeLeft);
+            margeRight = Math.max(0, margeRight);
             const extendedN = N + 1;
             const totalRows = 2 * extendedN - 1;
             svg.setAttribute('height', (totalRows - 1) * w * 0.866 + w);
@@ -124,7 +122,8 @@ class HexGridGame {
                         hex.setAttribute('cursor', 'pointer');
                         hex.dataset.hexNumber = hexNumber;
                         hex.dataset.state = 0; // Toujours initialisé à GRIS
-                        hex.setAttribute('fill', '#b2bec3');
+                        const zoneColor = hex.dataset.zoneId ? this.getZoneColor(hex.dataset.zoneId) : '#b2bec3';
+                        hex.setAttribute('fill', zoneColor);
                         hex.setAttribute('stroke', 'none');
                         hex.setAttribute('stroke-width', '0');
                         hexNumber++;
@@ -160,11 +159,18 @@ class HexGridGame {
         state = (state + 1) % 3;
         hex.dataset.state = state;
         if (state === 0) {
-            hex.setAttribute('fill', '#b2bec3'); // gris
+            const zoneColor = hex.dataset.zoneId ? this.getZoneColor(hex.dataset.zoneId) : '#b2bec3';
+            hex.setAttribute('fill', zoneColor);
+            hex.setAttribute('stroke', 'none');
+            hex.setAttribute('stroke-width', '0');
         } else if (state === 1) {
             hex.setAttribute('fill', '#222'); // noir
+            hex.setAttribute('stroke', 'none');
+            hex.setAttribute('stroke-width', '0');
         } else {
             hex.setAttribute('fill', '#fff'); // blanc
+            hex.setAttribute('stroke', 'none');
+            hex.setAttribute('stroke-width', '0');
         }
         // Incrémenter/décrémenter actual_black sur les contraintes I, J, K
         const i = parseInt(hex.dataset.i);
@@ -306,11 +312,18 @@ class HexGridGame {
                 allZoneCells.forEach(cell => {
                     cell.dataset.state = newState;
                     if (newState === 0) {
-                        cell.setAttribute('fill', '#b2bec3'); // gris
+                        const zoneColor = cell.dataset.zoneId ? this.getZoneColor(cell.dataset.zoneId) : '#b2bec3';
+                        cell.setAttribute('fill', zoneColor);
+                        cell.setAttribute('stroke', 'none');
+                        cell.setAttribute('stroke-width', '0');
                     } else if (newState === 1) {
                         cell.setAttribute('fill', '#222'); // noir
+                        cell.setAttribute('stroke', 'none');
+                        cell.setAttribute('stroke-width', '0');
                     } else {
                         cell.setAttribute('fill', '#fff'); // blanc
+                        cell.setAttribute('stroke', 'none');
+                        cell.setAttribute('stroke-width', '0');
                     }
                 });
                 // Mettre à jour les contraintes une seule fois
@@ -337,6 +350,7 @@ class HexGridGame {
     
     // Méthode simplifiée pour afficher le tooltip
     showSimpleTooltip(e, hex) {
+        if (this.mode === 'game') return; // Pas de tooltip en mode GAME
         const tooltip = this.hexTooltip;
         if (!tooltip) return;
         // Données de debug SVG
@@ -346,10 +360,14 @@ class HexGridGame {
         const N = this.gridSize;
         const maxHexes = 2 * N;
         const hexSize = this.hexSize;
-        const margeLeft = Math.floor((svgWidth - (maxHexes * hexSize)) / 2);
-        const margeRight = Math.ceil((svgWidth - (maxHexes * hexSize)) / 2);
+        let margeLeft = Math.floor((svgWidth - (maxHexes * hexSize)) / 2);
+        let margeRight = Math.ceil((svgWidth - (maxHexes * hexSize)) / 2);
         const cx = hex.dataset.cx ? Math.round(parseFloat(hex.dataset.cx)) : '?';
         const cy = hex.dataset.cy ? Math.round(parseFloat(hex.dataset.cy)) : '?';
+        const svgAttrWidth = svg.width && svg.width.baseVal ? svg.width.baseVal.value : '?';
+        const parentWidth = svg.parentNode && svg.parentNode.clientWidth ? svg.parentNode.clientWidth : '?';
+        let warning = '';
+        if (margeLeft < 0) warning = `<div style='color:red'><b>⚠️ Marge négative !</b></div>`;
         tooltip.style.display = 'block';
         tooltip.style.left = (e.clientX + 16) + 'px';
         tooltip.style.top = (e.clientY + 16) + 'px';
@@ -395,9 +413,12 @@ class HexGridGame {
             <hr style='margin:4px 0;'>
             <div><b>Debug SVG</b></div>
             <div>SVG: ${svgWidth} x ${svgHeight}</div>
+            <div>SVG attr width: ${svgAttrWidth}</div>
+            <div>Parent width: ${parentWidth}</div>
             <div>Max cellules ligne centrale: ${maxHexes}</div>
             <div>hexSize: ${hexSize}px</div>
             <div>marge gauche: ${margeLeft}px, marge droite: ${margeRight}px</div>
+            ${warning}
             <div>cellule (cx,cy): (${cx}, ${cy})</div>
         `;
         tooltip.innerHTML = html;
@@ -526,6 +547,8 @@ class HexGridGame {
                 if (cell.dataset.type === 'game') {
                     const state = parseInt(cell.dataset.state);
                     if (state === 0) {
+                        const zoneColor = cell.dataset.zoneId ? this.getZoneColor(cell.dataset.zoneId) : '#b2bec3';
+                        cell.setAttribute('fill', zoneColor);
                         cell.setAttribute('stroke', 'none');
                         cell.setAttribute('stroke-width', '0');
                     } else if (state === 1) {
@@ -846,7 +869,10 @@ class HexGridGame {
                 const gameCells = this.hexGridSvg.querySelectorAll('polygon[data-type="game"]');
                 gameCells.forEach(cell => {
                     cell.dataset.state = 0;
-                    cell.setAttribute('fill', '#b2bec3');
+                    const zoneColor = cell.dataset.zoneId ? this.getZoneColor(cell.dataset.zoneId) : '#b2bec3';
+                    cell.setAttribute('fill', zoneColor);
+                    cell.setAttribute('stroke', 'none');
+                    cell.setAttribute('stroke-width', '0');
                 });
                 // Réappliquer les contraintes depuis la config après la génération et la réinitialisation
                 if (conf.constraints) {
@@ -866,17 +892,20 @@ class HexGridGame {
         this.isGridEven = (N % 2 === 0);
         const svg = this.hexGridSvg;
         svg.innerHTML = '';
-        // --- Calcul compact responsive ---
+        // Synchroniser la largeur du SVG avec celle de son parent
         svg.style.width = '100%';
         svg.style.height = 'auto';
+        // PAS d'attribut width
         const svgWidth = svg.clientWidth;
         const maxHexes = 2 * N - 1 + 2;
         const hexSize = Math.floor(svgWidth / maxHexes);
         this.hexSize = hexSize;
         const w = this.hexSize;
         const h = Math.sqrt(3) / 2 * w;
-        const margeLeft = Math.floor((svgWidth - (maxHexes * hexSize)) / 2);
-        const margeRight = Math.ceil((svgWidth - (maxHexes * hexSize)) / 2);
+        let margeLeft = Math.floor((svgWidth - (maxHexes * hexSize)) / 2);
+        let margeRight = Math.ceil((svgWidth - (maxHexes * hexSize)) / 2);
+        margeLeft = Math.max(0, margeLeft);
+        margeRight = Math.max(0, margeRight);
         const extendedN = N + 1;
         const totalRows = 2 * extendedN - 1;
         svg.setAttribute('height', (totalRows - 1) * w * 0.866 + w);
@@ -919,7 +948,8 @@ class HexGridGame {
                     hex.setAttribute('cursor', 'pointer');
                     hex.dataset.hexNumber = hexNumber;
                     hex.dataset.state = 0; // Toujours initialisé à GRIS
-                    hex.setAttribute('fill', '#b2bec3');
+                    const zoneColor = hex.dataset.zoneId ? this.getZoneColor(hex.dataset.zoneId) : '#b2bec3';
+                    hex.setAttribute('fill', zoneColor);
                     hex.setAttribute('stroke', 'none');
                     hex.setAttribute('stroke-width', '0');
                     hexNumber++;
@@ -1193,32 +1223,30 @@ class HexGridGame {
         return 'INCONNU';
     }
 
-    // Génère une couleur unique et vive pour chaque zoneId (lettre)
+    // Génère une couleur unique et pastel pour chaque zoneId (lettre)
     getZoneColor(zoneId) {
-        // Palette de couleurs vives (20 couleurs distinctes)
+        // Palette de couleurs pastel, bien distinctes, sans blanc, noir ou gris
         const palette = [
-            '#e6194b', // rouge vif
-            '#3cb44b', // vert vif
-            '#ffe119', // jaune vif
-            '#4363d8', // bleu vif
-            '#f58231', // orange vif
-            '#911eb4', // violet vif
-            '#46f0f0', // cyan vif
-            '#f032e6', // magenta vif
-            '#bcf60c', // vert citron
-            '#fabebe', // rose clair
-            '#008080', // teal
-            '#e6beff', // lavande
-            '#9a6324', // marron
-            '#fffac8', // jaune pâle
-            '#800000', // bordeaux
-            '#aaffc3', // vert menthe
-            '#808000', // olive
-            '#ffd8b1', // pêche
-            '#000075', // bleu nuit
-            '#808080', // gris
-            '#ffffff', // blanc (pour sécurité, à éviter)
-            '#000000'  // noir (pour sécurité, à éviter)
+            '#ffd1dc', // rose pastel
+            '#b5ead7', // vert menthe pastel
+            '#c7ceea', // bleu lavande pastel
+            '#f7cac9', // rose clair pastel
+            '#ffdac1', // pêche pastel
+            '#e2f0cb', // vert clair pastel
+            '#b5ead7', // turquoise pastel
+            '#f1cbff', // violet pastel
+            '#c9c9ff', // bleu pastel
+            '#f3ffe3', // vert très clair pastel
+            '#fff5ba', // jaune pastel
+            '#ffb7b2', // corail pastel
+            '#b5ead7', // vert d'eau pastel
+            '#b5d6ea', // bleu ciel pastel
+            '#e2f0cb', // vert pistache pastel
+            '#f7d6e0', // rose dragée pastel
+            '#f6dfeb', // lilas pastel
+            '#ffe5b4', // abricot pastel
+            '#d5e1df', // vert sauge pastel
+            '#e0bbE4'  // mauve pastel
         ];
         if (!zoneId) return null;
         // Hash simple basé sur le code char
@@ -1237,32 +1265,11 @@ class HexGridGame {
         // Supprimer les anciens hexagones de fond de zone
         const oldZoneBg = this.hexGridSvg.querySelectorAll('polygon.zone-background');
         oldZoneBg.forEach(bg => bg.remove());
-        // Pour chaque cellule de jeu
+        // Pour chaque cellule de jeu, aucune bordure par défaut
         const gameCells = this.hexGridSvg.querySelectorAll('polygon[data-type="game"]');
         gameCells.forEach(cell => {
-            const zoneId = cell.dataset.zoneId;
-            if (zoneId) {
-                const color = this.getZoneColor(zoneId);
-                // Créer un hexagone de fond plus grand
-                const cx = parseFloat(cell.dataset.cx);
-                const cy = parseFloat(cell.dataset.cy);
-                const size = this.hexSize+2;
-                const polygonBg = this.createHexPolygon(cx, cy, size / 2 + 2);
-                const bg = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                bg.setAttribute('points', polygonBg);
-                bg.setAttribute('fill', color);
-                bg.setAttribute('stroke', 'none');
-                bg.setAttribute('class', 'zone-background');
-                bg.setAttribute('pointer-events', 'none');
-                // Insérer le fond juste avant la cellule principale
-                cell.parentNode.insertBefore(bg, cell);
-                // Bordure de zone
-                cell.setAttribute('stroke', color);
-                cell.setAttribute('stroke-width', '3');
-            } else {
-                cell.setAttribute('stroke', 'none');
-                cell.setAttribute('stroke-width', '0');
-            }
+            cell.setAttribute('stroke', 'none');
+            cell.setAttribute('stroke-width', '0');
         });
     }
 
@@ -1281,6 +1288,11 @@ class HexGridGame {
 }
 
 // Initialiser le jeu quand la page est chargée
-document.addEventListener('DOMContentLoaded', () => {
-    new HexGridGame();
+window.addEventListener('load', () => {
+    const game = new HexGridGame();
+    if (window.GRIDS_DEFINITION && window.GRIDS_DEFINITION.length > 0) {
+        game.loadGridFromConf(window.GRIDS_DEFINITION[0]);
+    } else {
+        game.generateGrid();
+    }
 }); 
