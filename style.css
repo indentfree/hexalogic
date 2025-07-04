@@ -112,9 +112,6 @@ button:active {
     border-radius: 15px;
     backdrop-filter: blur(10px);
     min-height: 400px;
-    width: 90vw;
-    max-width: 1200px;
-    margin: 0 auto;
 }
 
 #hexGrid {
@@ -211,10 +208,9 @@ button:active {
 /* Suppression des styles .hex-row et .hexagon pour la version SVG */
 #hexGridSvg {
     width: 100%;
-    height: auto;
+    height: 600px;
     display: block;
-    margin-left: 0;
-    margin-right: 0;
+    margin: 0 auto;
     background: none;
 }
 

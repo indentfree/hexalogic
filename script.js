@@ -9,6 +9,12 @@ class HexGridGame {
             this.gridSize = 4; // Valeur par défaut
         }
         
+        if (this.hexSizeInput) {
+            this.hexSize = parseInt(this.hexSizeInput.value);
+        } else {
+            this.hexSize = 40; // Valeur par défaut
+        }
+        
         this.selectedHexes = new Set();
         this.score = 0;
         this.grid = [];
@@ -35,6 +41,7 @@ class HexGridGame {
         this.newGameBtn = document.getElementById('generateGrid');
         this.clearBtn = document.getElementById('clearGrid');
         this.gridSizeInput = document.getElementById('gridSize');
+        this.hexSizeInput = document.getElementById('hexSize');
         this.controlsDiv = document.querySelector('.controls');
     }
     
@@ -55,36 +62,30 @@ class HexGridGame {
             });
         }
         
-        // Responsive : régénérer la grille à chaque resize
-        window.addEventListener('resize', () => this.generateGrid());
+        if (this.hexSizeInput) {
+            this.hexSizeInput.addEventListener('change', () => {
+                this.hexSize = parseInt(this.hexSizeInput.value);
+                this.generateGrid();
+            });
+        }
     }
     
     generateGrid() {
         this.clearGrid();
+        
         const N = this.gridSize;
         this.isGridEven = (N % 2 === 0);
-        // Calcul dynamique de la taille des hexagones pour que la grille tienne dans la largeur du conteneur
-        const gridContainer = document.querySelector('.grid-container');
-        let containerWidth = 800; // valeur par défaut
-        if (gridContainer) {
-            containerWidth = gridContainer.clientWidth;
-        } else if (window.innerWidth) {
-            containerWidth = window.innerWidth * 0.9;
-        }
-        const extendedN = N + 1;
-        const maxHexes = extendedN + extendedN - 1;
-        // Légère marge interne (5%)
-        const availableWidth = containerWidth * 0.95;
-        // Calcul de la taille optimale d'un hexagone pour que la grille tienne dans la largeur
-        this.hexSize = Math.floor(availableWidth / maxHexes);
         const size = this.hexSize;
         const w = size;
         const h = Math.sqrt(3) / 2 * size;
+        // Générer une grille de côté N+1 pour inclure la couronne de contraintes
+        const extendedN = N + 1;
         const totalRows = 2 * extendedN - 1;
         const svg = this.hexGridSvg;
         svg.innerHTML = '';
-        // Ajout d'une marge de 10% de chaque côté pour garantir la visibilité complète
-        const svgWidth = (maxHexes) * w * 1.2;
+        // Calculer la taille du SVG pour la grille étendue
+        const maxHexes = extendedN + extendedN - 1;
+        const svgWidth = (maxHexes) * w;
         const svgHeight = (totalRows - 1) * w * 0.866 + w;
         svg.setAttribute('width', svgWidth);
         svg.setAttribute('height', svgHeight);
@@ -97,11 +98,10 @@ class HexGridGame {
             const hexesInRow = extendedN + Math.min(row, totalRows - 1 - row);
             const offset = Math.abs(extendedN - 1 - row);
             const rowWidth = hexesInRow * w;
-            // Décalage horizontal avec la marge
-            const shiftX = ((svgWidth - rowWidth) / 2);
+            const shiftX = (svgWidth - rowWidth) / 2;
             for (let col = 0; col < hexesInRow; col++) {
                 // Coordonnées du centre
-                const cx = (offset + col) * w + w / 2 - shiftX + 1.5 * w;
+                const cx = (offset + col) * w + w / 2 - shiftX;
                 const cy = row * w * 0.866 + w / 2;
                 
                 const polygon = this.createHexPolygon(cx, cy, size / 2 - 0.5);
@@ -875,8 +875,7 @@ class HexGridGame {
         const svg = this.hexGridSvg;
         svg.innerHTML = '';
         const maxHexes = extendedN + extendedN - 1;
-        // Ajout d'une marge de 10% de chaque côté pour garantir la visibilité complète
-        const svgWidth = (maxHexes) * w * 1.5   ;
+        const svgWidth = (maxHexes) * w;
         const svgHeight = (totalRows - 1) * w * 0.866 + w;
         svg.setAttribute('width', svgWidth);
         svg.setAttribute('height', svgHeight);
@@ -888,10 +887,9 @@ class HexGridGame {
             const hexesInRow = extendedN + Math.min(row, totalRows - 1 - row);
             const offset = Math.abs(extendedN - 1 - row);
             const rowWidth = hexesInRow * w;
-            // Décalage horizontal avec la marge
-            const shiftX = ((svgWidth - rowWidth) / 2);
+            const shiftX = (svgWidth - rowWidth) / 2;
             for (let col = 0; col < hexesInRow; col++) {
-                const cx = (offset + col) * w + w / 2 - shiftX - 1.01 * w;
+                const cx = (offset + col) * w + w / 2 - shiftX;
                 const cy = row * w * 0.866 + w / 2;
                 const polygon = this.createHexPolygon(cx, cy, size / 2 - 0.5);
                 const hex = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
