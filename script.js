@@ -19,6 +19,13 @@ class HexGridGame {
         this.updateYamlExport();
         this.setYamlExportVisibility();
         this.setControlsVisibility();
+        // Dans le constructeur de HexGridGame, après initializeElements :
+        const gridSelector = document.getElementById('gridSelector');
+        if (gridSelector) gridSelector.style.display = '';
+        // Au tout début du script, ou dans le constructeur de HexGridGame, s'assurer que le message de victoire est caché par défaut :
+        // Par exemple, dans le constructeur :
+        // const msgDiv = document.getElementById('victoryMsg');
+        // if (msgDiv) msgDiv.style.display = 'none';
     }
     
     initializeElements() {
@@ -55,6 +62,9 @@ class HexGridGame {
     }
     
     generateGrid() {
+        // Cacher le message de victoire à chaque régénération
+        const msgDiv = document.getElementById('victoryMsg');
+        if (msgDiv) msgDiv.style.display = 'none';
         this.clearGrid();
         const svg = this.hexGridSvg;
         svg.innerHTML = '';
@@ -804,6 +814,9 @@ class HexGridGame {
         if (toggleBtn) {
             toggleBtn.textContent = 'Mode: ' + (this.mode === 'edit' ? 'Edit' : 'Game');
             toggleBtn.addEventListener('click', () => {
+                // Cacher le message de victoire lors du changement de mode
+                const msgDiv = document.getElementById('victoryMsg');
+                if (msgDiv) msgDiv.style.display = 'none';
                 this.mode = (this.mode === 'edit') ? 'game' : 'edit';
                 toggleBtn.textContent = 'Mode: ' + (this.mode === 'edit' ? 'Edit' : 'Game');
                 this.setControlsVisibility();
@@ -887,6 +900,9 @@ class HexGridGame {
     }
 
     generateGridFromTextualGrid(textual, constraints, textual_zones) {
+        // Cacher le message de victoire à chaque régénération
+        const msgDiv = document.getElementById('victoryMsg');
+        if (msgDiv) msgDiv.style.display = 'none';
         this.clearGrid();
         const N = this.gridSize = this.detectGridSizeFromTextualGrid(textual);
         this.isGridEven = (N % 2 === 0);
@@ -1073,15 +1089,28 @@ class HexGridGame {
         cells.forEach(cell => {
             const expected = cell.dataset.expected_black;
             const current = cell.dataset.actual_black;
+            // Trouver le texte associé à la contrainte
+            const row = cell.dataset.row;
+            const col = cell.dataset.col;
+            const valueText = this.hexGridSvg.querySelector(`text.constraint-value[data-row='${row}'][data-col='${col}']`);
             if (this.mode === 'game' && expected !== undefined && expected !== '') {
-                if (parseInt(current || '0') === parseInt(expected)) {
+                const exp = parseInt(expected);
+                const act = parseInt(current || '0');
+                if (act < exp) {
+                    cell.setAttribute('fill', '#fff'); // blanc
+                    if (valueText) valueText.setAttribute('fill', '#222'); // texte noir
+                    allOk = false;
+                } else if (act === exp) {
                     cell.setAttribute('fill', '#27ae60'); // vert
+                    if (valueText) valueText.setAttribute('fill', '#fff'); // texte blanc
                 } else {
                     cell.setAttribute('fill', '#e74c3c'); // rouge
+                    if (valueText) valueText.setAttribute('fill', '#fff'); // texte blanc
                     allOk = false;
                 }
             } else {
                 cell.setAttribute('fill', '#ff0000');
+                if (valueText) valueText.setAttribute('fill', '#fff'); // texte blanc
             }
         });
         if (this.mode === 'game') {
@@ -1223,38 +1252,35 @@ class HexGridGame {
         return 'INCONNU';
     }
 
-    // Génère une couleur unique et pastel pour chaque zoneId (lettre)
+    // Génère une couleur unique, très contrastée et bien répartie pour chaque zoneId (lettre)
     getZoneColor(zoneId) {
-        // Palette de couleurs pastel, bien distinctes, sans blanc, noir ou gris
-        const palette = [
-            '#ffd1dc', // rose pastel
-            '#b5ead7', // vert menthe pastel
-            '#c7ceea', // bleu lavande pastel
-            '#f7cac9', // rose clair pastel
-            '#ffdac1', // pêche pastel
-            '#e2f0cb', // vert clair pastel
-            '#b5ead7', // turquoise pastel
-            '#f1cbff', // violet pastel
-            '#c9c9ff', // bleu pastel
-            '#f3ffe3', // vert très clair pastel
-            '#fff5ba', // jaune pastel
-            '#ffb7b2', // corail pastel
-            '#b5ead7', // vert d'eau pastel
-            '#b5d6ea', // bleu ciel pastel
-            '#e2f0cb', // vert pistache pastel
-            '#f7d6e0', // rose dragée pastel
-            '#f6dfeb', // lilas pastel
-            '#ffe5b4', // abricot pastel
-            '#d5e1df', // vert sauge pastel
-            '#e0bbE4'  // mauve pastel
-        ];
         if (!zoneId) return null;
-        // Hash simple basé sur le code char
-        let idx = 0;
-        for (let i = 0; i < zoneId.length; i++) {
-            idx += zoneId.charCodeAt(i);
+        // Générer une palette HSL de 30 couleurs bien réparties
+        const N = 30;
+        const palette = [];
+        for (let i = 0; i < N; i++) {
+            // Décalage pour éviter que 0 et N/2 soient trop proches
+            const hue = (i * 360 / N + (180 / N)) % 360;
+            palette.push(`hsl(${hue}, 70%, 55%)`);
         }
-        return palette[idx % palette.length];
+        // Mélange de Fisher-Yates déterministe pour l'ordre d'accès
+        function shuffledIndices(n) {
+            const arr = Array.from({length: n}, (_, i) => i);
+            for (let i = n - 1; i > 0; i--) {
+                // Utilise un mélange déterministe basé sur i
+                const j = (i * 13 + 7) % n;
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+        const shuffled = shuffledIndices(N);
+        // Hash simple
+        let hash = 0;
+        for (let i = 0; i < zoneId.length; i++) {
+            hash = (hash * 31 + zoneId.charCodeAt(i)) % 100000;
+        }
+        const paletteIndex = shuffled[hash % N];
+        return palette[paletteIndex];
     }
 
     // Applique une couleur de contour unique à chaque zoneId (palette), peu importe l'état
@@ -1290,6 +1316,7 @@ class HexGridGame {
 // Initialiser le jeu quand la page est chargée
 window.addEventListener('load', () => {
     const game = new HexGridGame();
+    game.populateGridSelector();
     if (window.GRIDS_DEFINITION && window.GRIDS_DEFINITION.length > 0) {
         game.loadGridFromConf(window.GRIDS_DEFINITION[0]);
     } else {
