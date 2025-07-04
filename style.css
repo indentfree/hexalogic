@@ -15,6 +15,18 @@ body {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
+    width: 95vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+@media (orientation: landscape) {
+  .container {
+    width: 50vw;
+    min-width: 400px;
+    max-width: 1200px;
+  }
 }
 
 header {
@@ -30,8 +42,9 @@ h1 {
     text-align: center;
     color: #4a5568;
     margin-bottom: 20px;
-    font-size: 2.5rem;
-    font-weight: 700;
+    font-size: 1.5rem;
+    font-weight: 100;
+    width: 100%;
 }
 
 .controls {
@@ -208,10 +221,21 @@ button:active {
 /* Suppression des styles .hex-row et .hexagon pour la version SVG */
 #hexGridSvg {
     width: 100%;
-    height: 600px;
+    height: auto;
     display: block;
-    margin: 0 auto;
     background: none;
+    border: 2px solid red;
+    box-sizing: border-box;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+@media (orientation: landscape) {
+  #hexGridSvg {
+    width: 50%;
+    min-width: 400px;
+    max-width: 1200px;
+  }
 }
 
 #hexTooltip {
@@ -258,4 +282,13 @@ polygon[stroke="#2980b9"] {
     max-width: 600px;
     box-sizing: border-box;
     display: block;
+} 
+
+#hexGridContainer {
+    margin: 0 auto;
+}
+
+body > div[style*='display: flex'] {
+    justify-content: center !important;
+    align-items: center !important;
 } 

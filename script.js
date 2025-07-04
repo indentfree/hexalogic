@@ -9,12 +9,6 @@ class HexGridGame {
             this.gridSize = 4; // Valeur par défaut
         }
         
-        if (this.hexSizeInput) {
-            this.hexSize = parseInt(this.hexSizeInput.value);
-        } else {
-            this.hexSize = 40; // Valeur par défaut
-        }
-        
         this.selectedHexes = new Set();
         this.score = 0;
         this.grid = [];
@@ -41,7 +35,6 @@ class HexGridGame {
         this.newGameBtn = document.getElementById('generateGrid');
         this.clearBtn = document.getElementById('clearGrid');
         this.gridSizeInput = document.getElementById('gridSize');
-        this.hexSizeInput = document.getElementById('hexSize');
         this.controlsDiv = document.querySelector('.controls');
     }
     
@@ -62,107 +55,92 @@ class HexGridGame {
             });
         }
         
-        if (this.hexSizeInput) {
-            this.hexSizeInput.addEventListener('change', () => {
-                this.hexSize = parseInt(this.hexSizeInput.value);
-                this.generateGrid();
-            });
-        }
+        // Responsive : régénérer la grille à chaque resize
+        window.addEventListener('resize', () => this.generateGrid());
     }
     
     generateGrid() {
         this.clearGrid();
-        
-        const N = this.gridSize;
-        this.isGridEven = (N % 2 === 0);
-        const size = this.hexSize;
-        const w = size;
-        const h = Math.sqrt(3) / 2 * size;
-        // Générer une grille de côté N+1 pour inclure la couronne de contraintes
-        const extendedN = N + 1;
-        const totalRows = 2 * extendedN - 1;
         const svg = this.hexGridSvg;
         svg.innerHTML = '';
-        // Calculer la taille du SVG pour la grille étendue
-        const maxHexes = extendedN + extendedN - 1;
-        const svgWidth = (maxHexes) * w;
-        const svgHeight = (totalRows - 1) * w * 0.866 + w;
-        svg.setAttribute('width', svgWidth);
-        svg.setAttribute('height', svgHeight);
-        this.grid = [];
-        let hexNumber = 1;
-        
-        // Créer tous les hexagones
-        const hexCells = [];
-        for (let row = 0; row < totalRows; row++) {
-            const hexesInRow = extendedN + Math.min(row, totalRows - 1 - row);
-            const offset = Math.abs(extendedN - 1 - row);
-            const rowWidth = hexesInRow * w;
-            const shiftX = (svgWidth - rowWidth) / 2;
-            for (let col = 0; col < hexesInRow; col++) {
-                // Coordonnées du centre
-                const cx = (offset + col) * w + w / 2 - shiftX;
-                const cy = row * w * 0.866 + w / 2;
-                
-                const polygon = this.createHexPolygon(cx, cy, size / 2 - 0.5);
-                const hex = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                hex.setAttribute('points', polygon);
-                
-                // Déterminer si c'est une cellule de bordure (contrainte) ou de jeu
-                const isBorderCell = this.isBorderCell(row, col, extendedN, totalRows);
-                let isUselessCell = false;
-                if (isBorderCell) {
-                    isUselessCell = this.isUselessConstraintCell(row, col, extendedN, totalRows);
+        svg.style.width = '100%';
+        svg.style.height = 'auto';
+        // On attend le layout pour avoir la largeur réelle du SVG
+        setTimeout(() => {
+            const svgWidth = svg.clientWidth;
+            const N = this.gridSize;
+            const maxHexes = 2 * N - 1 + 2;
+            // Calcul compact : chaque hexagone occupe hexSize, pas de marge entre
+            const hexSize = Math.floor(svgWidth / maxHexes);
+            this.hexSize = hexSize;
+            const w = this.hexSize;
+            const h = Math.sqrt(3) / 2 * w;
+            const margeLeft = Math.floor((svgWidth - (maxHexes * hexSize)) / 2);
+            const margeRight = Math.ceil((svgWidth - (maxHexes * hexSize)) / 2);
+            const extendedN = N + 1;
+            const totalRows = 2 * extendedN - 1;
+            svg.setAttribute('height', (totalRows - 1) * w * 0.866 + w);
+            this.grid = [];
+            let hexNumber = 1;
+            // Créer tous les hexagones
+            const hexCells = [];
+            for (let row = 0; row < totalRows; row++) {
+                const hexesInRow = extendedN + Math.min(row, totalRows - 1 - row);
+                const offset = Math.abs(extendedN - 1 - row);
+                // Décalage horizontal pour centrer la ligne
+                const leftMargin = margeLeft + (offset * w) / 2;
+                for (let col = 0; col < hexesInRow; col++) {
+                    // Coordonnée du centre
+                    const cx = leftMargin + col * w + w / 2;
+                    const cy = row * w * 0.866 + w / 2;
+                    const polygon = this.createHexPolygon(cx, cy, w / 2 - 0.5);
+                    const hex = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                    hex.setAttribute('points', polygon);
+                    // Déterminer si c'est une cellule de bordure (contrainte) ou de jeu
+                    const isBorderCell = this.isBorderCell(row, col, extendedN, totalRows);
+                    let isUselessCell = false;
+                    if (isBorderCell) {
+                        isUselessCell = this.isUselessConstraintCell(row, col, extendedN, totalRows);
+                    }
+                    // Calculer les coordonnées (row,col) dans un système rectangulaire complet
+                    const logicalRow = row;
+                    const logicalCol = col + Math.floor(offset / 2);
+                    // Stocker les informations de base
+                    hex.dataset.row = logicalRow;
+                    hex.dataset.col = logicalCol;
+                    hex.dataset.cx = cx;
+                    hex.dataset.cy = cy;
+                    hex.dataset.type = isBorderCell ? (isUselessCell ? 'useless' : 'constraint') : 'game';
+                    if (isBorderCell && isUselessCell) {
+                        hex.setAttribute('fill', '#9b59b6');
+                        hex.setAttribute('stroke', '#8e44ad');
+                        hex.setAttribute('stroke-width', '1');
+                        hex.setAttribute('pointer-events', 'none');
+                    } else if (isBorderCell) {
+                        hex.setAttribute('fill', '#ff0000');
+                        hex.setAttribute('stroke', '#b2bec3');
+                        hex.setAttribute('stroke-width', '1');
+                    } else {
+                        hex.setAttribute('cursor', 'pointer');
+                        hex.dataset.hexNumber = hexNumber;
+                        hex.dataset.state = 0; // Toujours initialisé à GRIS
+                        hex.setAttribute('fill', '#b2bec3');
+                        hex.setAttribute('stroke', 'none');
+                        hex.setAttribute('stroke-width', '0');
+                        hexNumber++;
+                    }
+                    hexCells.push(hex);
+                    svg.appendChild(hex);
                 }
-                
-                // Calculer les coordonnées (row,col) dans un système rectangulaire complet
-                // Les coordonnées sont calculées comme si toutes les cellules existaient
-                const logicalRow = row;
-                // Pour les colonnes, aligner les lignes paires et impaires entre elles
-                // Les lignes impaires sont décalées de 0.5 par rapport aux lignes paires
-                const logicalCol = col + Math.floor(offset / 2);
-                
-                // Stocker les informations de base
-                hex.dataset.row = logicalRow;
-                hex.dataset.col = logicalCol;
-                hex.dataset.cx = cx;
-                hex.dataset.cy = cy;
-                hex.dataset.type = isBorderCell ? (isUselessCell ? 'useless' : 'constraint') : 'game';
-                
-                if (isBorderCell && isUselessCell) {
-                    hex.setAttribute('fill', '#9b59b6');
-                    hex.setAttribute('stroke', '#8e44ad');
-                    hex.setAttribute('stroke-width', '1');
-                    hex.setAttribute('pointer-events', 'none');
-                } else if (isBorderCell) {
-                    hex.setAttribute('fill', '#ff0000');
-                    hex.setAttribute('stroke', '#b2bec3');
-                    hex.setAttribute('stroke-width', '1');
-                } else {
-                    hex.setAttribute('cursor', 'pointer');
-                    hex.dataset.hexNumber = hexNumber;
-                    hex.dataset.state = 0; // Toujours initialisé à GRIS
-                    // Appliquer la couleur GRIS
-                    hex.setAttribute('fill', '#b2bec3');
-                    hex.setAttribute('stroke', 'none');
-                    hex.setAttribute('stroke-width', '0');
-                    hexNumber++;
-                }
-                
-                hexCells.push(hex);
-                svg.appendChild(hex);
             }
-        }
-        
-        // Propagation IJK récursive depuis la cellule centrale
-        this.affecterEtVerifierIJKRecursif(this.gridSize, this.gridSize, 0, 0, 0);
-        this.assignConstraintIds();
-        // Ajouter les textes et événements simples
-        this.addSimpleTextsAndEvents(hexCells);
-        
-        this.updateDisplay();
-        this.updateYamlExport();
-        this.updateZoneBorders();
+            // Propagation IJK récursive depuis la cellule centrale
+            this.affecterEtVerifierIJKRecursif(this.gridSize, this.gridSize, 0, 0, 0);
+            this.assignConstraintIds();
+            this.addSimpleTextsAndEvents(hexCells);
+            this.updateDisplay();
+            this.updateYamlExport();
+            this.updateZoneBorders();
+        }, 0);
     }
     
     createHexPolygon(cx, cy, r) {
@@ -359,17 +337,25 @@ class HexGridGame {
     
     // Méthode simplifiée pour afficher le tooltip
     showSimpleTooltip(e, hex) {
-        if (this.mode === 'game') {
-            this.hideTooltip();
-            return;
-        }
         const tooltip = this.hexTooltip;
         if (!tooltip) return;
+        // Données de debug SVG
+        const svg = this.hexGridSvg;
+        const svgWidth = svg.clientWidth;
+        const svgHeight = svg.clientHeight;
+        const N = this.gridSize;
+        const maxHexes = 2 * N;
+        const hexSize = this.hexSize;
+        const margeLeft = Math.floor((svgWidth - (maxHexes * hexSize)) / 2);
+        const margeRight = Math.ceil((svgWidth - (maxHexes * hexSize)) / 2);
+        const cx = hex.dataset.cx ? Math.round(parseFloat(hex.dataset.cx)) : '?';
+        const cy = hex.dataset.cy ? Math.round(parseFloat(hex.dataset.cy)) : '?';
         tooltip.style.display = 'block';
         tooltip.style.left = (e.clientX + 16) + 'px';
         tooltip.style.top = (e.clientY + 16) + 'px';
+        let html = '';
         if (hex.dataset.type === 'game') {
-            tooltip.innerHTML = `
+            html += `
                 <div>Cellule de jeu</div>
                 <div>ID: <b>${hex.dataset.hexNumber ?? '?'}</b></div>
                 <div>Position: (row=${hex.dataset.row}, col=${hex.dataset.col})</div>
@@ -384,7 +370,7 @@ class HexGridGame {
             } else {
                 extra = `<div>actual_black: <b>${hex.dataset.actual_black ?? '?'}</b></div>`;
             }
-            tooltip.innerHTML = `
+            html += `
                 <div>Cellule contrainte</div>
                 <div>Position: (row=${hex.dataset.row}, col=${hex.dataset.col})</div>
                 <div>Coordonnées IJK: (i=${hex.dataset.i}, j=${hex.dataset.j}, k=${hex.dataset.k})</div>
@@ -397,13 +383,24 @@ class HexGridGame {
                 this.highlightGameCellsByConstraint(type, val);
             }
         } else {
-            tooltip.innerHTML = `
+            html += `
                 <div>${hex.dataset.type}</div>
                 <div>Position: (row=${hex.dataset.row}, col=${hex.dataset.col})</div>
                 <div>Coordonnées IJK: (i=${hex.dataset.i}, j=${hex.dataset.j}, k=${hex.dataset.k})</div>
                 ${hex.dataset.constraintId ? `<div>ID contrainte: ${hex.dataset.constraintId}</div>` : ''}
             `;
         }
+        // Ajout debug SVG
+        html += `
+            <hr style='margin:4px 0;'>
+            <div><b>Debug SVG</b></div>
+            <div>SVG: ${svgWidth} x ${svgHeight}</div>
+            <div>Max cellules ligne centrale: ${maxHexes}</div>
+            <div>hexSize: ${hexSize}px</div>
+            <div>marge gauche: ${margeLeft}px, marge droite: ${margeRight}px</div>
+            <div>cellule (cx,cy): (${cx}, ${cy})</div>
+        `;
+        tooltip.innerHTML = html;
     }
     
     hideTooltip() {
@@ -867,18 +864,22 @@ class HexGridGame {
         this.clearGrid();
         const N = this.gridSize = this.detectGridSizeFromTextualGrid(textual);
         this.isGridEven = (N % 2 === 0);
-        const size = this.hexSize;
-        const w = size;
-        const h = Math.sqrt(3) / 2 * size;
-        const extendedN = N + 1;
-        const totalRows = 2 * extendedN - 1;
         const svg = this.hexGridSvg;
         svg.innerHTML = '';
-        const maxHexes = extendedN + extendedN - 1;
-        const svgWidth = (maxHexes) * w;
-        const svgHeight = (totalRows - 1) * w * 0.866 + w;
-        svg.setAttribute('width', svgWidth);
-        svg.setAttribute('height', svgHeight);
+        // --- Calcul compact responsive ---
+        svg.style.width = '100%';
+        svg.style.height = 'auto';
+        const svgWidth = svg.clientWidth;
+        const maxHexes = 2 * N - 1 + 2;
+        const hexSize = Math.floor(svgWidth / maxHexes);
+        this.hexSize = hexSize;
+        const w = this.hexSize;
+        const h = Math.sqrt(3) / 2 * w;
+        const margeLeft = Math.floor((svgWidth - (maxHexes * hexSize)) / 2);
+        const margeRight = Math.ceil((svgWidth - (maxHexes * hexSize)) / 2);
+        const extendedN = N + 1;
+        const totalRows = 2 * extendedN - 1;
+        svg.setAttribute('height', (totalRows - 1) * w * 0.866 + w);
         this.grid = [];
         let hexNumber = 1;
         // Initialisation : toutes les cellules de jeu sont GRIS
@@ -886,12 +887,11 @@ class HexGridGame {
         for (let row = 0; row < totalRows; row++) {
             const hexesInRow = extendedN + Math.min(row, totalRows - 1 - row);
             const offset = Math.abs(extendedN - 1 - row);
-            const rowWidth = hexesInRow * w;
-            const shiftX = (svgWidth - rowWidth) / 2;
+            const leftMargin = margeLeft + (offset * w) / 2;
             for (let col = 0; col < hexesInRow; col++) {
-                const cx = (offset + col) * w + w / 2 - shiftX;
+                const cx = leftMargin + col * w + w / 2;
                 const cy = row * w * 0.866 + w / 2;
-                const polygon = this.createHexPolygon(cx, cy, size / 2 - 0.5);
+                const polygon = this.createHexPolygon(cx, cy, w / 2 - 0.5);
                 const hex = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
                 hex.setAttribute('points', polygon);
                 const isBorderCell = this.isBorderCell(row, col, extendedN, totalRows);
