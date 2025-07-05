@@ -89,6 +89,7 @@ class HexGridGame {
             }
             
             const N = this.gridSize;
+            this.isGridEven = (N % 2 === 0); // Mettre à jour isGridEven à chaque changement de taille
             const maxHexes = 2 * N - 1 + 2;
             // Calcul compact : chaque hexagone occupe hexSize, pas de marge entre
             const hexSize = Math.floor(svgWidth / maxHexes);
@@ -620,7 +621,8 @@ class HexGridGame {
                 gameCells: { total: 0, affected: 0, verified: 0, inconsistent: 0 },
                 constraintCells: { total: 0, affected: 0, verified: 0, inconsistent: 0 },
                 uselessCells: { total: 0, affected: 0, verified: 0, inconsistent: 0 },
-                inconsistencies: []
+                inconsistencies: [],
+                cellList: [] // Liste pour stocker toutes les cellules avec leurs IJK
             };
             
             // Compter le nombre total de cellules par type
@@ -650,6 +652,18 @@ class HexGridGame {
             } else if (cell.dataset.type === 'useless') {
                 stats.uselessCells.affected++;
             }
+            
+            // Ajouter la cellule à la liste avec ses coordonnées IJK
+            const cellInfo = {
+                id: cell.dataset.hexNumber || 'N/A',
+                type: cell.dataset.type,
+                row: parseInt(cell.dataset.row),
+                col: parseInt(cell.dataset.col),
+                i: i,
+                j: j,
+                k: k
+            };
+            stats.cellList.push(cellInfo);
         } else {
             // Sinon, on vérifie la cohérence
             const oldI = parseInt(cell.dataset.i);
@@ -684,6 +698,18 @@ class HexGridGame {
                 } else if (cell.dataset.type === 'useless') {
                     stats.uselessCells.verified++;
                 }
+                
+                // Ajouter la cellule à la liste même si elle était déjà affectée
+                const cellInfo = {
+                    id: cell.dataset.hexNumber || 'N/A',
+                    type: cell.dataset.type,
+                    row: parseInt(cell.dataset.row),
+                    col: parseInt(cell.dataset.col),
+                    i: parseInt(cell.dataset.i),
+                    j: parseInt(cell.dataset.j),
+                    k: parseInt(cell.dataset.k)
+                };
+                stats.cellList.push(cellInfo);
             }
             // Si déjà affecté et cohérent, on ne propage pas plus loin
             return;
@@ -739,6 +765,31 @@ class HexGridGame {
             } else {
                 console.log('Aucune incohérence détectée ✓');
             }
+            
+            // Générer et afficher la liste des cellules triées par ID
+            console.log('=== LISTE DES CELLULES PAR ID ===');
+            const sortedCells = stats.cellList.sort((a, b) => {
+                // Trier d'abord par type, puis par ID numérique
+                if (a.type !== b.type) {
+                    const typeOrder = { 'game': 1, 'constraint': 2, 'useless': 3 };
+                    return typeOrder[a.type] - typeOrder[b.type];
+                }
+                // Pour les cellules de jeu, trier par ID numérique
+                if (a.type === 'game' && b.type === 'game') {
+                    return parseInt(a.id) - parseInt(b.id);
+                }
+                // Pour les autres types, trier par position (row, col)
+                if (a.row !== b.row) return a.row - b.row;
+                return a.col - b.col;
+            });
+            
+            sortedCells.forEach(cell => {
+                const idStr = cell.id === 'N/A' ? 'N/A' : cell.id.padStart(2);
+                const typeStr = cell.type.padEnd(10);
+                const posStr = `(${cell.row},${cell.col})`.padEnd(8);
+                const ijkStr = `I=${cell.i.toString().padStart(2)} J=${cell.j.toString().padStart(2)} K=${cell.k.toString().padStart(2)}`;
+                console.log(`ID ${idStr} [${typeStr}] ${posStr} ${ijkStr}`);
+            });
             console.log('================================');
         }
     }
