@@ -609,109 +609,18 @@ class HexGridGame {
         }
     }
     
-    // Affecte ou vérifie récursivement les coordonnées IJK à toute la grille
-    affecterEtVerifierIJKRecursif(row, col, i, j, k, stats = null) {
+    // Affecte récursivement les coordonnées IJK à toute la grille
+    affecterEtVerifierIJKRecursif(row, col, i, j, k) {
         const cell = this.findCellByCoords(row, col);
         if (!cell) return;
-        
-        // Initialiser les statistiques si c'est le premier appel
-        if (stats === null) {
-            stats = {
-                gridSize: this.gridSize,
-                gameCells: { total: 0, affected: 0, verified: 0, inconsistent: 0 },
-                constraintCells: { total: 0, affected: 0, verified: 0, inconsistent: 0 },
-                uselessCells: { total: 0, affected: 0, verified: 0, inconsistent: 0 },
-                inconsistencies: [],
-                cellList: [] // Liste pour stocker toutes les cellules avec leurs IJK
-            };
-            
-            // Compter le nombre total de cellules par type
-            const allCells = this.hexGridSvg.querySelectorAll('polygon');
-            allCells.forEach(cell => {
-                if (cell.dataset.type === 'game') {
-                    stats.gameCells.total++;
-                } else if (cell.dataset.type === 'constraint') {
-                    stats.constraintCells.total++;
-                } else if (cell.dataset.type === 'useless') {
-                    stats.uselessCells.total++;
-                }
-            });
-        }
         
         // Si la cellule n'a pas encore de coordonnées, on les affecte
         if (cell.dataset.i === undefined || cell.dataset.j === undefined || cell.dataset.k === undefined) {
             cell.dataset.i = i;
             cell.dataset.j = j;
             cell.dataset.k = k;
-            
-            // Mettre à jour les statistiques selon le type de cellule
-            if (cell.dataset.type === 'game') {
-                stats.gameCells.affected++;
-            } else if (cell.dataset.type === 'constraint') {
-                stats.constraintCells.affected++;
-            } else if (cell.dataset.type === 'useless') {
-                stats.uselessCells.affected++;
-            }
-            
-            // Ajouter la cellule à la liste avec ses coordonnées IJK
-            const cellInfo = {
-                id: cell.dataset.hexNumber || 'N/A',
-                type: cell.dataset.type,
-                row: parseInt(cell.dataset.row),
-                col: parseInt(cell.dataset.col),
-                i: i,
-                j: j,
-                k: k
-            };
-            stats.cellList.push(cellInfo);
         } else {
-            // Sinon, on vérifie la cohérence
-            const oldI = parseInt(cell.dataset.i);
-            const oldJ = parseInt(cell.dataset.j);
-            const oldK = parseInt(cell.dataset.k);
-            if (oldI !== i || oldJ !== j || oldK !== k) {
-                const inconsistency = {
-                    id: cell.dataset.hexNumber,
-                    row: row,
-                    col: col,
-                    type: cell.dataset.type,
-                    existing: [oldI, oldJ, oldK],
-                    recalculated: [i, j, k]
-                };
-                stats.inconsistencies.push(inconsistency);
-                console.error(`Incohérence IJK pour cellule id=${cell.dataset.hexNumber} (row=${row},col=${col}) : existant=(${oldI},${oldJ},${oldK}), recalculé=(${i},${j},${k})`);
-                
-                // Mettre à jour les statistiques d'incohérence
-                if (cell.dataset.type === 'game') {
-                    stats.gameCells.inconsistent++;
-                } else if (cell.dataset.type === 'constraint') {
-                    stats.constraintCells.inconsistent++;
-                } else if (cell.dataset.type === 'useless') {
-                    stats.uselessCells.inconsistent++;
-                }
-            } else {
-                // Mettre à jour les statistiques de vérification
-                if (cell.dataset.type === 'game') {
-                    stats.gameCells.verified++;
-                } else if (cell.dataset.type === 'constraint') {
-                    stats.constraintCells.verified++;
-                } else if (cell.dataset.type === 'useless') {
-                    stats.uselessCells.verified++;
-                }
-                
-                // Ajouter la cellule à la liste même si elle était déjà affectée
-                const cellInfo = {
-                    id: cell.dataset.hexNumber || 'N/A',
-                    type: cell.dataset.type,
-                    row: parseInt(cell.dataset.row),
-                    col: parseInt(cell.dataset.col),
-                    i: parseInt(cell.dataset.i),
-                    j: parseInt(cell.dataset.j),
-                    k: parseInt(cell.dataset.k)
-                };
-                stats.cellList.push(cellInfo);
-            }
-            // Si déjà affecté et cohérent, on ne propage pas plus loin
+            // Si déjà affecté, on ne propage pas plus loin
             return;
         }
         
@@ -734,63 +643,7 @@ class HexGridGame {
             } else if (d === 5) { // gauche
                 ni = i - 1; nk = k - 1;
             }
-            this.affecterEtVerifierIJKRecursif(nrow, ncol, ni, nj, nk, stats);
-        }
-        
-        // Afficher le rapport final si c'est l'appel initial
-        if (stats !== null && row === this.gridSize && col === this.gridSize) {
-            console.log('=== RAPPORT PROPAGATION IJK ===');
-            console.log(`Taille de grille: ${stats.gridSize}`);
-            console.log('Cellules de jeu:');
-            console.log(`  - Total: ${stats.gameCells.total}`);
-            console.log(`  - Affectées: ${stats.gameCells.affected}`);
-            console.log(`  - Vérifiées: ${stats.gameCells.verified}`);
-            console.log(`  - Incohérentes: ${stats.gameCells.inconsistent}`);
-            console.log('Cellules de contrainte:');
-            console.log(`  - Total: ${stats.constraintCells.total}`);
-            console.log(`  - Affectées: ${stats.constraintCells.affected}`);
-            console.log(`  - Vérifiées: ${stats.constraintCells.verified}`);
-            console.log(`  - Incohérentes: ${stats.constraintCells.inconsistent}`);
-            console.log('Cellules useless:');
-            console.log(`  - Total: ${stats.uselessCells.total}`);
-            console.log(`  - Affectées: ${stats.uselessCells.affected}`);
-            console.log(`  - Vérifiées: ${stats.uselessCells.verified}`);
-            console.log(`  - Incohérentes: ${stats.uselessCells.inconsistent}`);
-            
-            if (stats.inconsistencies.length > 0) {
-                console.log('Incohérences détectées:');
-                stats.inconsistencies.forEach(inc => {
-                    console.log(`  - ID=${inc.id} (${inc.row},${inc.col}) [${inc.type}]: existant=${inc.existing}, recalculé=${inc.recalculated}`);
-                });
-            } else {
-                console.log('Aucune incohérence détectée ✓');
-            }
-            
-            // Générer et afficher la liste des cellules triées par ID
-            console.log('=== LISTE DES CELLULES PAR ID ===');
-            const sortedCells = stats.cellList.sort((a, b) => {
-                // Trier d'abord par type, puis par ID numérique
-                if (a.type !== b.type) {
-                    const typeOrder = { 'game': 1, 'constraint': 2, 'useless': 3 };
-                    return typeOrder[a.type] - typeOrder[b.type];
-                }
-                // Pour les cellules de jeu, trier par ID numérique
-                if (a.type === 'game' && b.type === 'game') {
-                    return parseInt(a.id) - parseInt(b.id);
-                }
-                // Pour les autres types, trier par position (row, col)
-                if (a.row !== b.row) return a.row - b.row;
-                return a.col - b.col;
-            });
-            
-            sortedCells.forEach(cell => {
-                const idStr = cell.id === 'N/A' ? 'N/A' : cell.id.padStart(2);
-                const typeStr = cell.type.padEnd(10);
-                const posStr = `(${cell.row},${cell.col})`.padEnd(8);
-                const ijkStr = `I=${cell.i.toString().padStart(2)} J=${cell.j.toString().padStart(2)} K=${cell.k.toString().padStart(2)}`;
-                console.log(`ID ${idStr} [${typeStr}] ${posStr} ${ijkStr}`);
-            });
-            console.log('================================');
+            this.affecterEtVerifierIJKRecursif(nrow, ncol, ni, nj, nk);
         }
     }
     
@@ -1186,29 +1039,20 @@ class HexGridGame {
 
     initConstraintsFromConf(constraints) {
         const crownCells = this.listCrownCells();
-        console.log('crownCells:', crownCells);
         const uselessIndices = crownCells
             .map((cell, index) => ({ cell, index }))
-            //.filter(({ cell }) => cell.type === 'useless')
             .map(({ index }) => index)
             .sort((a, b) => a - b);
 
-        let section = 0;
-        let indices = [0, 0, 0];
-        let allExpectedTmp = [[0],constraints.K, [0], constraints.I ,[0], constraints.J];
-        let allExpected = allExpectedTmp.flat()
-        console.log('allExpected:', allExpected);
+        let allExpectedTmp = [[0], constraints.K, [0], constraints.I, [0], constraints.J];
+        let allExpected = allExpectedTmp.flat();
+        
         // Affectation réelle
-        section = 0;
-        indices = [0, 0, 0];
         crownCells.forEach((cell, idx) => {
             const svgCell = this.findCellByCoords(cell.row, cell.col);
             if (svgCell) {
-                console.log(`cell found with idx=${idx}, (row,col)=(${cell.row},${cell.col}) and val=${allExpected[idx]}`);
                 const val = allExpected[idx];
                 svgCell.dataset.expected_black = (val !== undefined && val !== null) ? val : '';
-            } else {
-                console.log('cell not found:', cell);
             }
         });
         this.updateConstraintTexts();

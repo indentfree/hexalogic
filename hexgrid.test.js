@@ -249,15 +249,12 @@ QUnit.test('Test debug: diagnostic des cellules de la couronne (grille 3)', func
     cells.forEach(cell => {
         if (cell.dataset.type === 'useless') {
             uselessCount++;
-            console.log('USELESS trouvée:', cell.dataset.row, cell.dataset.col);
         } else if (cell.dataset.type === 'constraint') {
             constraintCount++;
         } else if (cell.dataset.type === 'game') {
             gameCount++;
         }
     });
-    
-    console.log(`Total cellules: ${cells.length}, USELESS: ${uselessCount}, CONSTRAINT: ${constraintCount}, GAME: ${gameCount}`);
     
     // Vérifier qu'il y a des cellules USELESS
     assert.ok(uselessCount > 0, `Il doit y avoir des cellules USELESS (trouvé: ${uselessCount})`);
@@ -275,19 +272,15 @@ QUnit.test('Test debug: diagnostic des cellules de la couronne (grille 3)', func
     assert.ok(startCell, 'La cellule USELESS de départ (0,1) doit exister');
     
     if (startCell) {
-        console.log('Cellule de départ trouvée:', startCell.dataset.row, startCell.dataset.col);
-        
         // Vérifier les voisins de la cellule de départ
         const row = parseInt(startCell.dataset.row);
         const col = parseInt(startCell.dataset.col);
         const neighbors = game.getNeighborsByCoords(row, col);
-        console.log('Voisins de la cellule de départ:', neighbors);
         
         const neighborCells = neighbors.map(([nrow, ncol]) => game.findCellByCoords(nrow, ncol));
         const crownNeighbors = neighborCells.filter(cell => 
             cell && (cell.dataset.type === 'constraint' || cell.dataset.type === 'useless')
         );
-        console.log('Voisins de la couronne:', crownNeighbors.map(c => `(${c.dataset.row},${c.dataset.col})/${c.dataset.type}`));
     }
 });
 
@@ -314,8 +307,7 @@ QUnit.test('Test listCrownCells: ordre des cellules de la couronne (grille 3)', 
     assert.equal(lastCell.row, 1, 'La dernière cellule doit être sur la ligne 1');
     assert.equal(lastCell.col, 1, 'La dernière cellule doit être sur la colonne 1');
     
-    // Afficher la liste pour debug
-    console.log('Cellules de la couronne (grille 3):', crownCells.map(c => `${c.coords}/${c.type}`).join(', '));
+
 });
 
 QUnit.test('Test listCrownCells: ordre des cellules de la couronne (grille 4)', function(assert) {
@@ -335,9 +327,7 @@ QUnit.test('Test listCrownCells: ordre des cellules de la couronne (grille 4)', 
             `Cellule ${index} (${cell.coords}) doit être de type constraint ou useless`);
     });
     
-    // Afficher la liste pour debug
-    console.log('Cellules de la couronne (grille 4):', crownCells.map(c => `${c.coords}/${c.type}`).join(', '));
-    console.log('Première cellule:', crownCells[0].coords, 'Dernière cellule:', crownCells[crownCells.length - 1].coords);
+
 });
 
 QUnit.test('Test nombre hexagonal centré : cohérence du nombre de cellules de jeu', function(assert) {
@@ -409,32 +399,4 @@ QUnit.test('Vérifications globales pour N=3,4,5,6', function(assert) {
     });
 }); 
 
-QUnit.test('Debug: Vérification cellule ID=4 dans grille de taille 4', function(assert) {
-    const game = initTestGame(4);
-    
-    // Trouver la cellule ID=4
-    const cell4 = game.findCellById(4);
-    assert.ok(cell4, 'Cellule ID=4 doit exister');
-    
-    if (cell4) {
-        console.log('=== DEBUG CELLULE ID=4 ===');
-        console.log('Type:', cell4.dataset.type);
-        console.log('Row/Col:', cell4.dataset.row, cell4.dataset.col);
-        console.log('IJK:', cell4.dataset.i, cell4.dataset.j, cell4.dataset.k);
-        
-        // Vérifier que k=0 (selon votre observation en mode EDIT/GAME)
-        const k = parseInt(cell4.dataset.k);
-        assert.equal(k, 0, `Cellule ID=4 doit avoir k=0 (trouvé k=${k})`);
-        
-        // Vérifier que la cellule est bien dans la diagonale (BAS-GAUCHE vers HAUT-DROITE)
-        const row = parseInt(cell4.dataset.row);
-        const col = parseInt(cell4.dataset.col);
-        console.log('Position:', row, col);
-        
-        // Vérifier la cellule centrale
-        const centerCell = game.findCellByCoords(4, 4);
-        if (centerCell) {
-            console.log('Cellule centrale:', centerCell.dataset.hexNumber, centerCell.dataset.i, centerCell.dataset.j, centerCell.dataset.k);
-        }
-    }
-}); 
+ 
