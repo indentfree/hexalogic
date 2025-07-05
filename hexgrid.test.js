@@ -4,21 +4,56 @@
 
 // Utilitaire pour initialiser un jeu de test
 function initTestGame(gridSize) {
-    // Créer un élément SVG temporaire si nécessaire
-    if (!document.getElementById('hexGridSvg')) {
-        const tempSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        tempSvg.id = 'hexGridSvg';
-        tempSvg.style.position = 'absolute';
-        tempSvg.style.left = '-9999px';
-        document.body.appendChild(tempSvg);
+    // Supprimer l'ancien SVG s'il existe
+    const oldSvg = document.getElementById('hexGridSvg');
+    if (oldSvg) {
+        oldSvg.remove();
     }
-    const game = new HexGridGame();
-    game.gridSize = gridSize;
-    game.generateGrid();
+    
+    // Créer un nouvel élément SVG temporaire unique pour ce test
+    const tempSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    tempSvg.id = 'hexGridSvg';
+    tempSvg.style.position = 'absolute';
+    tempSvg.style.left = '-9999px';
+    tempSvg.style.width = '600px'; // Largeur fixe pour les tests
+    tempSvg.style.height = '400px'; // Hauteur fixe pour les tests
+    document.body.appendChild(tempSvg);
+    
+    // Créer l'instance avec la taille de grille en paramètre
+    const game = new HexGridGame(gridSize);
+    
+    // Générer la grille avec un callback pour s'assurer qu'elle est prête
+    game.generateGrid(() => {
+        // Callback vide - la grille est maintenant générée de manière synchrone
+    });
     return game;
 }
 
-QUnit.module('HexaLogic Grid Tests');
+// Configuration QUnit pour éviter les exécutions parallèles
+QUnit.config.autostart = false;
+
+QUnit.module('HexaLogic Grid Tests', {
+    afterEach: function() {
+        // Nettoyer tous les SVGs temporaires créés par les tests
+        const tempSvgs = document.querySelectorAll('svg[id^="hexGridSvg_"]');
+        tempSvgs.forEach(svg => {
+            if (svg.parentNode) {
+                svg.parentNode.removeChild(svg);
+            }
+        });
+        
+        // Nettoyer aussi le SVG principal s'il existe
+        const mainSvg = document.getElementById('hexGridSvg');
+        if (mainSvg) {
+            mainSvg.remove();
+        }
+    }
+});
+
+// Démarrer les tests une fois que tout est prêt
+document.addEventListener('DOMContentLoaded', function() {
+    QUnit.start();
+});
 
 QUnit.test('Test 1: Cellule centrale pour grille de côté 4', function(assert) {
     const game = initTestGame(4);
@@ -372,4 +407,34 @@ QUnit.test('Vérifications globales pour N=3,4,5,6', function(assert) {
             assert.equal(j, 0, `N=${N}: Cellule ID=${cell.dataset.hexNumber} sur la ligne centrale doit avoir j=0 (trouvé j=${j})`);
         });
     });
+}); 
+
+QUnit.test('Debug: Vérification cellule ID=4 dans grille de taille 4', function(assert) {
+    const game = initTestGame(4);
+    
+    // Trouver la cellule ID=4
+    const cell4 = game.findCellById(4);
+    assert.ok(cell4, 'Cellule ID=4 doit exister');
+    
+    if (cell4) {
+        console.log('=== DEBUG CELLULE ID=4 ===');
+        console.log('Type:', cell4.dataset.type);
+        console.log('Row/Col:', cell4.dataset.row, cell4.dataset.col);
+        console.log('IJK:', cell4.dataset.i, cell4.dataset.j, cell4.dataset.k);
+        
+        // Vérifier que k=0 (selon votre observation en mode EDIT/GAME)
+        const k = parseInt(cell4.dataset.k);
+        assert.equal(k, 0, `Cellule ID=4 doit avoir k=0 (trouvé k=${k})`);
+        
+        // Vérifier que la cellule est bien dans la diagonale (BAS-GAUCHE vers HAUT-DROITE)
+        const row = parseInt(cell4.dataset.row);
+        const col = parseInt(cell4.dataset.col);
+        console.log('Position:', row, col);
+        
+        // Vérifier la cellule centrale
+        const centerCell = game.findCellByCoords(4, 4);
+        if (centerCell) {
+            console.log('Cellule centrale:', centerCell.dataset.hexNumber, centerCell.dataset.i, centerCell.dataset.j, centerCell.dataset.k);
+        }
+    }
 }); 

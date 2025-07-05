@@ -1,9 +1,11 @@
 class HexGridGame {
-    constructor() {
+    constructor(gridSize = null) {
         this.initializeElements();
         
-        // Utiliser des valeurs par défaut si les éléments HTML n'existent pas
-        if (this.gridSizeInput) {
+        // Utiliser le paramètre gridSize s'il est fourni, sinon utiliser les valeurs par défaut
+        if (gridSize !== null) {
+            this.gridSize = gridSize;
+        } else if (this.gridSizeInput) {
             this.gridSize = parseInt(this.gridSizeInput.value);
         } else {
             this.gridSize = 4; // Valeur par défaut
@@ -31,7 +33,12 @@ class HexGridGame {
     initializeElements() {
         this.hexGridSvg = document.getElementById('hexGridSvg');
         if (!this.hexGridSvg) {
-            throw new Error('hexGridSvg non trouvé dans le DOM. Vérifiez que <svg id="hexGridSvg"> existe dans votre HTML.');
+            // Pour les tests, créer un SVG temporaire
+            this.hexGridSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            this.hexGridSvg.id = 'hexGridSvg';
+            this.hexGridSvg.style.width = '600px';
+            this.hexGridSvg.style.height = '400px';
+            document.body.appendChild(this.hexGridSvg);
         }
         this.hexTooltip = document.getElementById('hexTooltip');
         this.newGameBtn = document.getElementById('generateGrid');
@@ -61,7 +68,7 @@ class HexGridGame {
         window.addEventListener('resize', () => this.generateGrid());
     }
     
-    generateGrid() {
+    generateGrid(callback = null) {
         // Cacher le message de victoire à chaque régénération
         const msgDiv = document.getElementById('victoryMsg');
         if (msgDiv) msgDiv.style.display = 'none';
@@ -71,9 +78,16 @@ class HexGridGame {
         // Synchroniser la largeur du SVG avec celle de son parent
         svg.style.width = '100%';
         svg.style.height = 'auto';
-        // On attend le layout pour avoir la largeur réelle du SVG
-        setTimeout(() => {
-            const svgWidth = svg.clientWidth;
+        
+        // Fonction pour générer la grille (synchrone)
+        const generateGridContent = () => {
+            // Obtenir la largeur du SVG (avec fallback pour les tests)
+            let svgWidth = svg.clientWidth;
+            if (!svgWidth || svgWidth === 0) {
+                // Pour les tests ou si le layout n'est pas encore prêt
+                svgWidth = 600; // Valeur par défaut
+            }
+            
             const N = this.gridSize;
             const maxHexes = 2 * N - 1 + 2;
             // Calcul compact : chaque hexagone occupe hexSize, pas de marge entre
@@ -90,6 +104,7 @@ class HexGridGame {
             svg.setAttribute('height', (totalRows - 1) * w * 0.866 + w);
             this.grid = [];
             let hexNumber = 1;
+            
             // Créer tous les hexagones
             const hexCells = [];
             for (let row = 0; row < totalRows; row++) {
@@ -142,6 +157,7 @@ class HexGridGame {
                     svg.appendChild(hex);
                 }
             }
+            
             // Propagation IJK récursive depuis la cellule centrale
             this.affecterEtVerifierIJKRecursif(this.gridSize, this.gridSize, 0, 0, 0);
             this.assignConstraintIds();
@@ -149,8 +165,23 @@ class HexGridGame {
             this.updateDisplay();
             this.updateYamlExport();
             this.updateZoneBorders();
-        }, 0);
+            
+            // Appeler le callback si fourni
+            if (callback) {
+                callback();
+            }
+        };
+        
+        // Si un callback est fourni, exécuter immédiatement (pour les tests)
+        if (callback) {
+            generateGridContent();
+        } else {
+            // Sinon, attendre le layout (comportement normal)
+            setTimeout(generateGridContent, 0);
+        }
     }
+    
+
     
     createHexPolygon(cx, cy, r) {
         let points = [];
@@ -578,25 +609,86 @@ class HexGridGame {
     }
     
     // Affecte ou vérifie récursivement les coordonnées IJK à toute la grille
-    affecterEtVerifierIJKRecursif(row, col, i, j, k) {
+    affecterEtVerifierIJKRecursif(row, col, i, j, k, stats = null) {
         const cell = this.findCellByCoords(row, col);
         if (!cell) return;
+        
+        // Initialiser les statistiques si c'est le premier appel
+        if (stats === null) {
+            stats = {
+                gridSize: this.gridSize,
+                gameCells: { total: 0, affected: 0, verified: 0, inconsistent: 0 },
+                constraintCells: { total: 0, affected: 0, verified: 0, inconsistent: 0 },
+                uselessCells: { total: 0, affected: 0, verified: 0, inconsistent: 0 },
+                inconsistencies: []
+            };
+            
+            // Compter le nombre total de cellules par type
+            const allCells = this.hexGridSvg.querySelectorAll('polygon');
+            allCells.forEach(cell => {
+                if (cell.dataset.type === 'game') {
+                    stats.gameCells.total++;
+                } else if (cell.dataset.type === 'constraint') {
+                    stats.constraintCells.total++;
+                } else if (cell.dataset.type === 'useless') {
+                    stats.uselessCells.total++;
+                }
+            });
+        }
+        
         // Si la cellule n'a pas encore de coordonnées, on les affecte
         if (cell.dataset.i === undefined || cell.dataset.j === undefined || cell.dataset.k === undefined) {
             cell.dataset.i = i;
             cell.dataset.j = j;
             cell.dataset.k = k;
+            
+            // Mettre à jour les statistiques selon le type de cellule
+            if (cell.dataset.type === 'game') {
+                stats.gameCells.affected++;
+            } else if (cell.dataset.type === 'constraint') {
+                stats.constraintCells.affected++;
+            } else if (cell.dataset.type === 'useless') {
+                stats.uselessCells.affected++;
+            }
         } else {
             // Sinon, on vérifie la cohérence
             const oldI = parseInt(cell.dataset.i);
             const oldJ = parseInt(cell.dataset.j);
             const oldK = parseInt(cell.dataset.k);
             if (oldI !== i || oldJ !== j || oldK !== k) {
+                const inconsistency = {
+                    id: cell.dataset.hexNumber,
+                    row: row,
+                    col: col,
+                    type: cell.dataset.type,
+                    existing: [oldI, oldJ, oldK],
+                    recalculated: [i, j, k]
+                };
+                stats.inconsistencies.push(inconsistency);
                 console.error(`Incohérence IJK pour cellule id=${cell.dataset.hexNumber} (row=${row},col=${col}) : existant=(${oldI},${oldJ},${oldK}), recalculé=(${i},${j},${k})`);
+                
+                // Mettre à jour les statistiques d'incohérence
+                if (cell.dataset.type === 'game') {
+                    stats.gameCells.inconsistent++;
+                } else if (cell.dataset.type === 'constraint') {
+                    stats.constraintCells.inconsistent++;
+                } else if (cell.dataset.type === 'useless') {
+                    stats.uselessCells.inconsistent++;
+                }
+            } else {
+                // Mettre à jour les statistiques de vérification
+                if (cell.dataset.type === 'game') {
+                    stats.gameCells.verified++;
+                } else if (cell.dataset.type === 'constraint') {
+                    stats.constraintCells.verified++;
+                } else if (cell.dataset.type === 'useless') {
+                    stats.uselessCells.verified++;
+                }
             }
             // Si déjà affecté et cohérent, on ne propage pas plus loin
             return;
         }
+        
         // Propager aux voisins
         const voisins = this.getNeighborsByCoords(row, col);
         for (let d = 0; d < voisins.length; d++) {
@@ -616,7 +708,38 @@ class HexGridGame {
             } else if (d === 5) { // gauche
                 ni = i - 1; nk = k - 1;
             }
-            this.affecterEtVerifierIJKRecursif(nrow, ncol, ni, nj, nk);
+            this.affecterEtVerifierIJKRecursif(nrow, ncol, ni, nj, nk, stats);
+        }
+        
+        // Afficher le rapport final si c'est l'appel initial
+        if (stats !== null && row === this.gridSize && col === this.gridSize) {
+            console.log('=== RAPPORT PROPAGATION IJK ===');
+            console.log(`Taille de grille: ${stats.gridSize}`);
+            console.log('Cellules de jeu:');
+            console.log(`  - Total: ${stats.gameCells.total}`);
+            console.log(`  - Affectées: ${stats.gameCells.affected}`);
+            console.log(`  - Vérifiées: ${stats.gameCells.verified}`);
+            console.log(`  - Incohérentes: ${stats.gameCells.inconsistent}`);
+            console.log('Cellules de contrainte:');
+            console.log(`  - Total: ${stats.constraintCells.total}`);
+            console.log(`  - Affectées: ${stats.constraintCells.affected}`);
+            console.log(`  - Vérifiées: ${stats.constraintCells.verified}`);
+            console.log(`  - Incohérentes: ${stats.constraintCells.inconsistent}`);
+            console.log('Cellules useless:');
+            console.log(`  - Total: ${stats.uselessCells.total}`);
+            console.log(`  - Affectées: ${stats.uselessCells.affected}`);
+            console.log(`  - Vérifiées: ${stats.uselessCells.verified}`);
+            console.log(`  - Incohérentes: ${stats.uselessCells.inconsistent}`);
+            
+            if (stats.inconsistencies.length > 0) {
+                console.log('Incohérences détectées:');
+                stats.inconsistencies.forEach(inc => {
+                    console.log(`  - ID=${inc.id} (${inc.row},${inc.col}) [${inc.type}]: existant=${inc.existing}, recalculé=${inc.recalculated}`);
+                });
+            } else {
+                console.log('Aucune incohérence détectée ✓');
+            }
+            console.log('================================');
         }
     }
     
