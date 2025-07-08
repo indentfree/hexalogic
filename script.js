@@ -1329,6 +1329,103 @@ class HexGridGame {
             this.controlsDiv.style.display = (this.mode === 'edit') ? '' : 'none';
         }
     }
+
+    // Génère une grille aléatoire, affecte les contraintes et crée des zones de 2 à 5 cellules consécutives de même état
+    generateRandomPuzzle() {
+        // 1. Mettre toutes les cellules de jeu à un état aléatoire (NOIR ou BLANC)
+        const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
+        gameCells.forEach(cell => {
+            // 1 ou 2 (NOIR ou BLANC)
+            const state = Math.random() < 0.5 ? 1 : 2;
+            cell.dataset.state = state;
+            if (state === 1) {
+                cell.setAttribute('fill', '#222');
+            } else {
+                cell.setAttribute('fill', '#fff');
+            }
+            cell.setAttribute('stroke', 'none');
+            cell.setAttribute('stroke-width', '0');
+            delete cell.dataset.zoneId;
+        });
+        // 2. Créer les zones de 2 à 5 cellules consécutives de même état
+        this.createZonesForCurrentStates(gameCells);
+        // 3. Mettre à jour actual_black pour chaque contrainte
+        this.updateAllActualBlack();
+        // 4. Copier actual_black dans expected_black pour chaque contrainte
+        const constraintCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
+        constraintCells.forEach(cell => {
+            cell.dataset.expected_black = cell.dataset.actual_black;
+        });
+        // 5. Remettre toutes les cellules de jeu à GRIS
+        gameCells.forEach(cell => {
+            cell.dataset.state = 0;
+            const zoneColor = cell.dataset.zoneId ? this.getZoneColor(cell.dataset.zoneId) : '#b2bec3';
+            cell.setAttribute('fill', zoneColor);
+            cell.setAttribute('stroke', 'none');
+            cell.setAttribute('stroke-width', '0');
+        });
+        // 6. Mettre à jour l'affichage des contraintes et l'export YAML
+        this.updateConstraintTexts();
+        this.updateConstraintColors();
+        this.updateYamlExport();
+    }
+
+    // Crée des zones de 2 à 5 cellules consécutives de même état
+    createZonesForCurrentStates(gameCells) {
+        // Génère des zoneId : A, B, ..., Z, AA, AB, ...
+        function* zoneIdGenerator() {
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            let n = 0;
+            while (true) {
+                let id = '';
+                let x = n;
+                do {
+                    id = letters[x % 26] + id;
+                    x = Math.floor(x / 26) - 1;
+                } while (x >= 0);
+                yield id;
+                n++;
+            }
+        }
+        const gen = zoneIdGenerator();
+        // Réinitialiser les zoneId
+        gameCells.forEach(cell => { delete cell.dataset.zoneId; });
+        const visited = new Set();
+        for (const cell of gameCells) {
+            if (visited.has(cell)) continue;
+            const state = parseInt(cell.dataset.state);
+            if (state !== 1 && state !== 2) continue;
+            // BFS pour regrouper les cellules de même état
+            const cluster = [];
+            const queue = [cell];
+            visited.add(cell);
+            while (queue.length > 0 && cluster.length < 5) {
+                const current = queue.shift();
+                cluster.push(current);
+                const row = parseInt(current.dataset.row);
+                const col = parseInt(current.dataset.col);
+                const neighbors = this.getNeighborsByCoords(row, col)
+                    .map(([nrow, ncol]) => this.findCellByCoords(nrow, ncol))
+                    .filter(ncell => ncell && !visited.has(ncell) && ncell.dataset.type === 'game' && parseInt(ncell.dataset.state) === state);
+                for (const ncell of neighbors) {
+                    if (cluster.length < 5) {
+                        queue.push(ncell);
+                        visited.add(ncell);
+                    }
+                }
+            }
+            // Si cluster trop petit, essayer de l'étendre (pour éviter des zones de taille 1)
+            if (cluster.length < 2) {
+                // On ne crée pas de zone pour les isolés
+                continue;
+            }
+            // Attribuer un zoneId à ce cluster
+            const zoneId = gen.next().value;
+            for (const zcell of cluster) {
+                zcell.dataset.zoneId = zoneId;
+            }
+        }
+    }
 }
 
 // Initialiser le jeu quand la page est chargée
@@ -1339,5 +1436,14 @@ window.addEventListener('load', () => {
         game.loadGridFromConf(window.GRIDS_DEFINITION[0]);
     } else {
         game.generateGrid();
+    }
+    // Ajout du bouton si pas déjà présent
+    if (!document.getElementById('randomPuzzleBtn')) {
+        const btn = document.createElement('button');
+        btn.id = 'randomPuzzleBtn';
+        btn.textContent = 'Générer une grille aléatoire cohérente';
+        btn.style.margin = '8px';
+        btn.onclick = () => game.generateRandomPuzzle();
+        document.body.insertBefore(btn, document.body.firstChild);
     }
 }); 
