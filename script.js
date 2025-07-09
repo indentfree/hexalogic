@@ -1014,6 +1014,7 @@ class HexGridGame {
                 }
             }
         }
+        
         this.addSimpleTextsAndEvents(hexCells);
         this.updateDisplay();
         this.affecterEtVerifierIJKRecursif(this.gridSize, this.gridSize, 0, 0, 0);
@@ -1363,8 +1364,15 @@ class HexGridGame {
             // 5. Remettre toutes les cellules de jeu à GRIS
             gameCells.forEach(cell => {
                 cell.dataset.state = 0;
-                const zoneColor = cell.dataset.zoneId ? this.getZoneColor(cell.dataset.zoneId) : '#b2bec3';
-                cell.setAttribute('fill', zoneColor);
+                let fillColor;
+                if (cell.dataset.zoneId && cell.dataset.zoneId.startsWith('ISO')) {
+                    fillColor = this.isolatedZoneColors[cell.dataset.zoneId];
+                } else if (cell.dataset.zoneId) {
+                    fillColor = this.getZoneColor(cell.dataset.zoneId);
+                } else {
+                    fillColor = '#b2bec3'; // fallback gris si jamais
+                }
+                cell.setAttribute('fill', fillColor);
                 cell.setAttribute('stroke', 'none');
                 cell.setAttribute('stroke-width', '0');
             });
@@ -1398,6 +1406,9 @@ class HexGridGame {
             }
         }
         const gen = zoneIdGenerator();
+        // Pour les zones isolées (taille 1)
+        let isoCount = 1;
+        this.isolatedZoneColors = {};
         // Réinitialiser les zoneId
         gameCells.forEach(cell => { delete cell.dataset.zoneId; });
         const visited = new Set();
@@ -1424,15 +1435,31 @@ class HexGridGame {
                     }
                 }
             }
-            // Si cluster trop petit, essayer de l'étendre (pour éviter des zones de taille 1)
             if (cluster.length < 2) {
-                // On ne crée pas de zone pour les isolés
+                // Zone isolée (taille 1)
+                const isoId = 'ISO' + (isoCount++);
+                const hue = Math.floor(Math.random() * 360);
+                const color = `hsl(${hue}, 70%, 80%)`;
+                this.isolatedZoneColors[isoId] = color;
+                for (const zcell of cluster) {
+                    zcell.dataset.zoneId = isoId;
+                }
                 continue;
             }
             // Attribuer un zoneId à ce cluster
             const zoneId = gen.next().value;
             for (const zcell of cluster) {
                 zcell.dataset.zoneId = zoneId;
+            }
+        }
+        // Après la création des zones, colorer toutes les cellules sans zoneId (oubliées)
+        for (const cell of gameCells) {
+            if (!cell.dataset.zoneId) {
+                const isoId = 'ISO' + (isoCount++);
+                const hue = Math.floor(Math.random() * 360);
+                const color = `hsl(${hue}, 70%, 80%)`;
+                this.isolatedZoneColors[isoId] = color;
+                cell.dataset.zoneId = isoId;
             }
         }
     }
