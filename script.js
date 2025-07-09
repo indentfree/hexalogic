@@ -1332,46 +1332,56 @@ class HexGridGame {
 
     // Génère une grille aléatoire, affecte les contraintes et crée des zones de 2 à 5 cellules consécutives de même état
     generateRandomPuzzle() {
-        // 1. Mettre toutes les cellules de jeu à un état aléatoire (NOIR ou BLANC)
-        const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
-        gameCells.forEach(cell => {
-            // 1 ou 2 (NOIR ou BLANC)
-            const state = Math.random() < 0.5 ? 1 : 2;
-            cell.dataset.state = state;
-            if (state === 1) {
-                cell.setAttribute('fill', '#222');
-            } else {
-                cell.setAttribute('fill', '#fff');
-            }
-            cell.setAttribute('stroke', 'none');
-            cell.setAttribute('stroke-width', '0');
-            delete cell.dataset.zoneId;
+        // 0. Choisir N aléatoirement entre 3 et 10 et régénérer la grille
+        const N = Math.floor(Math.random() * 8) + 3; // 3 à 10 inclus
+        this.gridSize = N;
+        this.generateGrid(() => {
+            // 1. Mettre toutes les cellules de jeu à un état aléatoire (NOIR ou BLANC)
+            const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
+            gameCells.forEach(cell => {
+                // 1 ou 2 (NOIR ou BLANC)
+                const state = Math.random() < 0.5 ? 1 : 2;
+                cell.dataset.state = state;
+                if (state === 1) {
+                    cell.setAttribute('fill', '#222');
+                } else {
+                    cell.setAttribute('fill', '#fff');
+                }
+                cell.setAttribute('stroke', 'none');
+                cell.setAttribute('stroke-width', '0');
+                delete cell.dataset.zoneId;
+            });
+            // 2. Créer les zones de 2 à N/2 cellules consécutives de même état
+            this.createZonesForCurrentStates(gameCells, N);
+            // 3. Mettre à jour actual_black pour chaque contrainte
+            this.updateAllActualBlack();
+            // 4. Copier actual_black dans expected_black pour chaque contrainte
+            const constraintCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
+            constraintCells.forEach(cell => {
+                cell.dataset.expected_black = cell.dataset.actual_black;
+            });
+            // 5. Remettre toutes les cellules de jeu à GRIS
+            gameCells.forEach(cell => {
+                cell.dataset.state = 0;
+                const zoneColor = cell.dataset.zoneId ? this.getZoneColor(cell.dataset.zoneId) : '#b2bec3';
+                cell.setAttribute('fill', zoneColor);
+                cell.setAttribute('stroke', 'none');
+                cell.setAttribute('stroke-width', '0');
+            });
+            // 6. Mettre à jour l'affichage des contraintes et l'export YAML
+            this.updateConstraintTexts();
+            // Remettre à 0 toutes les valeurs actual_black des contraintes
+            const constraintCells2 = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
+            constraintCells2.forEach(cell => { cell.dataset.actual_black = 0; });
+            this.updateConstraintColors();
+            this.updateYamlExport();
+            //this.updateConstraintColors();
         });
-        // 2. Créer les zones de 2 à 5 cellules consécutives de même état
-        this.createZonesForCurrentStates(gameCells);
-        // 3. Mettre à jour actual_black pour chaque contrainte
-        this.updateAllActualBlack();
-        // 4. Copier actual_black dans expected_black pour chaque contrainte
-        const constraintCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
-        constraintCells.forEach(cell => {
-            cell.dataset.expected_black = cell.dataset.actual_black;
-        });
-        // 5. Remettre toutes les cellules de jeu à GRIS
-        gameCells.forEach(cell => {
-            cell.dataset.state = 0;
-            const zoneColor = cell.dataset.zoneId ? this.getZoneColor(cell.dataset.zoneId) : '#b2bec3';
-            cell.setAttribute('fill', zoneColor);
-            cell.setAttribute('stroke', 'none');
-            cell.setAttribute('stroke-width', '0');
-        });
-        // 6. Mettre à jour l'affichage des contraintes et l'export YAML
-        this.updateConstraintTexts();
-        this.updateConstraintColors();
-        this.updateYamlExport();
     }
 
-    // Crée des zones de 2 à 5 cellules consécutives de même état
-    createZonesForCurrentStates(gameCells) {
+    // Crée des zones de 2 à maxZoneSize cellules consécutives de même état
+    createZonesForCurrentStates(gameCells, N) {
+        const maxZoneSize = Math.max(2, Math.floor(N / 2)+2);
         // Génère des zoneId : A, B, ..., Z, AA, AB, ...
         function* zoneIdGenerator() {
             const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -1399,7 +1409,7 @@ class HexGridGame {
             const cluster = [];
             const queue = [cell];
             visited.add(cell);
-            while (queue.length > 0 && cluster.length < 5) {
+            while (queue.length > 0 && cluster.length < maxZoneSize) {
                 const current = queue.shift();
                 cluster.push(current);
                 const row = parseInt(current.dataset.row);
@@ -1408,7 +1418,7 @@ class HexGridGame {
                     .map(([nrow, ncol]) => this.findCellByCoords(nrow, ncol))
                     .filter(ncell => ncell && !visited.has(ncell) && ncell.dataset.type === 'game' && parseInt(ncell.dataset.state) === state);
                 for (const ncell of neighbors) {
-                    if (cluster.length < 5) {
+                    if (cluster.length < maxZoneSize) {
                         queue.push(ncell);
                         visited.add(ncell);
                     }
