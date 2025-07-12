@@ -15,6 +15,10 @@ class HexGridGame {
         this.score = 0;
         this.grid = [];
         this.mode = 'game'; // Forcer le mode par défaut à GAME
+        
+        // Système de suivi des coups
+        this.moveCount = 0;
+        this.moveHistory = [];
         this.bindEvents();
         // NE PAS générer la grille ici, attendre window.onload
         this.bindModeToggle();
@@ -65,13 +69,90 @@ class HexGridGame {
         }
         
         // Responsive : régénérer la grille à chaque resize
-        window.addEventListener('resize', () => this.generateGrid());
+        window.addEventListener('resize', () => this.resizeGrid());
     }
     
+    // Redimensionnement de la grille en préservant l'état des cellules
+    resizeGrid() {
+        // Sauvegarder l'état actuel des cellules de jeu
+        const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
+        const gameCellStates = new Map();
+        
+        gameCells.forEach(cell => {
+            const key = `${cell.dataset.row},${cell.dataset.col}`;
+            gameCellStates.set(key, {
+                state: cell.dataset.state,
+                zoneId: cell.dataset.zoneId,
+                fill: cell.getAttribute('fill')
+            });
+        });
+        
+        // Sauvegarder l'état actuel des cellules de contraintes
+        const constraintCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
+        const constraintStates = new Map();
+        
+        constraintCells.forEach(cell => {
+            const key = `${cell.dataset.row},${cell.dataset.col}`;
+            constraintStates.set(key, {
+                expected_black: cell.dataset.expected_black,
+                actual_black: cell.dataset.actual_black,
+                constraint_id: cell.dataset.constraint_id
+            });
+        });
+        
+        // Sauvegarder les données des zones isolées
+        const isolatedZones = { ...this.isolatedZoneColors };
+        
+        // Régénérer la grille
+        this.generateGrid(() => {
+            // Restaurer l'état des cellules de jeu
+            const newGameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
+            newGameCells.forEach(cell => {
+                const key = `${cell.dataset.row},${cell.dataset.col}`;
+                const savedState = gameCellStates.get(key);
+                if (savedState) {
+                    cell.dataset.state = savedState.state;
+                    cell.dataset.zoneId = savedState.zoneId;
+                    cell.setAttribute('fill', savedState.fill);
+                }
+            });
+            
+            // Restaurer l'état des cellules de contraintes
+            const newConstraintCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
+            newConstraintCells.forEach(cell => {
+                const key = `${cell.dataset.row},${cell.dataset.col}`;
+                const savedState = constraintStates.get(key);
+                if (savedState) {
+                    cell.dataset.expected_black = savedState.expected_black;
+                    cell.dataset.actual_black = savedState.actual_black;
+                    cell.dataset.constraint_id = savedState.constraint_id;
+                }
+            });
+            
+            // Restaurer les zones isolées
+            this.isolatedZoneColors = isolatedZones;
+            
+            // Mettre à jour l'affichage des contraintes
+            this.updateConstraintTexts();
+            this.updateConstraintColors();
+            
+            // Ne pas redémarrer l'animation automatiquement lors du resize
+            // this.startZoneColorAnimation();
+        });
+    }
+
     generateGrid(callback = null) {
         // Cacher le message de victoire à chaque régénération
         const msgDiv = document.getElementById('victoryMsg');
         if (msgDiv) msgDiv.style.display = 'none';
+        
+        // Réinitialiser le compteur de coups si c'est une nouvelle grille (pas un resize)
+        if (!callback || callback.toString().includes('resize')) {
+            this.moveCount = 0;
+            this.moveHistory = [];
+            this.updateMoveCounter();
+        }
+        
         this.clearGrid();
         const svg = this.hexGridSvg;
         svg.innerHTML = '';
@@ -200,6 +281,9 @@ class HexGridGame {
         const prevState = state;
         state = (state + 1) % 3;
         hex.dataset.state = state;
+        
+        // Enregistrer le coup dans l'historique
+        this.recordMove(hex, prevState, state);
         if (state === 0) {
             // Si la cellule a un zoneId, appliquer la même couleur à toute la zone
             let color;
@@ -394,7 +478,11 @@ class HexGridGame {
                 const allZoneCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"][data-zone-id="' + zoneId + '"]'));
                 // Déterminer le nouvel état (cycle comme la cellule cliquée)
                 let state = parseInt(hex.dataset.state);
+                const prevState = state;
                 const newState = (state + 1) % 3;
+                
+                // Enregistrer un seul coup pour toute la zone
+                this.recordZoneMove(allZoneCells, prevState, newState);
                 let color;
                 if (newState === 0) {
                     // Récupérer tous les voisins de la zone
@@ -1093,9 +1181,13 @@ class HexGridGame {
         constraintCells.forEach(cell => { cell.dataset.actual_black = 0; });
         this.updateConstraintTexts();
         this.updateConstraintColors();
-        this.updateZoneBorders();
-        this.updateYamlExport();
-        //this.startZoneColorAnimation();
+                    this.updateZoneBorders();
+            this.updateYamlExport();
+            // Animation désactivée par défaut
+            // this.startZoneColorAnimation();
+            
+            // S'assurer que les contrôles de jeu sont bien positionnés
+            this.repositionGameControls();
     }
 
     detectGridSizeFromTextualGrid(textual) {
@@ -1341,7 +1433,7 @@ class HexGridGame {
     getZoneColor(zoneId) {
         if (!zoneId) return null;
         // Générer une palette HSL de 30 couleurs bien réparties
-        const N = 50;
+        const N = 30;
         const palette = [];
         for (let i = 0; i < N; i++) {
             // Décalage pour éviter que 0 et N/2 soient trop proches
@@ -1430,6 +1522,11 @@ class HexGridGame {
         // 0. Choisir N aléatoirement entre 3 et 10 et régénérer la grille
         const N = Math.floor(Math.random() * 8) + 3; // 3 à 10 inclus
         this.gridSize = N;
+        
+        // Réinitialiser le compteur de coups
+        this.moveCount = 0;
+        this.moveHistory = [];
+        this.updateMoveCounter();
         this.generateGrid(() => {
             // 1. Mettre toutes les cellules de jeu à un état aléatoire (NOIR ou BLANC)
             const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
@@ -1478,7 +1575,11 @@ class HexGridGame {
             this.updateConstraintColors();
             this.updateYamlExport();
             //this.updateConstraintColors();
-            //this.startZoneColorAnimation();
+            // Animation désactivée par défaut
+            // this.startZoneColorAnimation();
+            
+            // S'assurer que les contrôles de jeu sont bien positionnés
+            this.repositionGameControls();
         });
     }
 
@@ -1628,6 +1729,144 @@ class HexGridGame {
             this._zoneColorAnimInterval = null;
         }
     }
+
+    // Bascule l'animation ON/OFF
+    toggleZoneColorAnimation() {
+        if (this._zoneColorAnimInterval) {
+            this.stopZoneColorAnimation();
+            return false; // Animation arrêtée
+        } else {
+            this.startZoneColorAnimation();
+            return true; // Animation démarrée
+        }
+    }
+
+    // Enregistre un coup dans l'historique
+    recordMove(hex, prevState, newState) {
+        console.log(`Recording move: ${prevState} -> ${newState}`);
+        this.moveCount++;
+        this.moveHistory.push({
+            type: 'single',
+            hex: hex,
+            row: parseInt(hex.dataset.row),
+            col: parseInt(hex.dataset.col),
+            prevState: prevState,
+            newState: newState,
+            prevFill: hex.getAttribute('fill'),
+            zoneId: hex.dataset.zoneId
+        });
+        this.updateMoveCounter();
+    }
+
+    // Enregistre un coup de zone dans l'historique
+    recordZoneMove(zoneCells, prevState, newState) {
+        console.log(`Recording zone move: ${prevState} -> ${newState} for ${zoneCells.length} cells`);
+        this.moveCount++;
+        this.moveHistory.push({
+            type: 'zone',
+            cells: zoneCells.map(cell => ({
+                hex: cell,
+                row: parseInt(cell.dataset.row),
+                col: parseInt(cell.dataset.col),
+                prevState: prevState,
+                newState: newState,
+                prevFill: cell.getAttribute('fill'),
+                zoneId: cell.dataset.zoneId
+            }))
+        });
+        this.updateMoveCounter();
+    }
+
+    // Annule le dernier coup
+    undoLastMove() {
+        console.log(`Undo called. History length: ${this.moveHistory.length}`);
+        if (this.moveHistory.length === 0) {
+            console.log('No moves to undo');
+            return;
+        }
+        
+        const lastMove = this.moveHistory.pop();
+        this.moveCount--;
+        
+        if (lastMove.type === 'zone') {
+            console.log(`Undoing zone move: ${lastMove.cells.length} cells`);
+            // Restaurer toutes les cellules de la zone
+            lastMove.cells.forEach(cellData => {
+                const hex = cellData.hex;
+                hex.dataset.state = cellData.prevState;
+                
+                // Restaurer l'apparence selon l'état
+                if (cellData.prevState === 0) {
+                    // État gris - restaurer la couleur de zone
+                    if (cellData.zoneId && cellData.zoneId.startsWith('ISO')) {
+                        hex.setAttribute('fill', this.isolatedZoneColors[cellData.zoneId] || '#b2bec3');
+                    } else if (cellData.zoneId) {
+                        hex.setAttribute('fill', this.getZoneColor(cellData.zoneId));
+                    } else {
+                        hex.setAttribute('fill', '#b2bec3');
+                    }
+                } else if (cellData.prevState === 1) {
+                    hex.setAttribute('fill', '#222'); // noir
+                } else {
+                    hex.setAttribute('fill', '#fff'); // blanc
+                }
+            });
+        } else {
+            console.log(`Undoing single move: ${lastMove.newState} -> ${lastMove.prevState}`);
+            // Restaurer une seule cellule
+            const hex = lastMove.hex;
+            hex.dataset.state = lastMove.prevState;
+            
+            // Restaurer l'apparence selon l'état
+            if (lastMove.prevState === 0) {
+                // État gris - restaurer la couleur de zone
+                if (lastMove.zoneId && lastMove.zoneId.startsWith('ISO')) {
+                    hex.setAttribute('fill', this.isolatedZoneColors[lastMove.zoneId] || '#b2bec3');
+                } else if (lastMove.zoneId) {
+                    hex.setAttribute('fill', this.getZoneColor(lastMove.zoneId));
+                } else {
+                    hex.setAttribute('fill', '#b2bec3');
+                }
+            } else if (lastMove.prevState === 1) {
+                hex.setAttribute('fill', '#222'); // noir
+            } else {
+                hex.setAttribute('fill', '#fff'); // blanc
+            }
+        }
+        
+        // Mettre à jour les contraintes
+        this.updateAllActualBlack();
+        this.updateConstraintTexts();
+        this.updateConstraintColors();
+        
+        this.updateMoveCounter();
+    }
+
+    // Met à jour l'affichage du compteur de coups
+    updateMoveCounter() {
+        const moveCounter = document.getElementById('moveCounter');
+        if (moveCounter) {
+            moveCounter.textContent = `Coups: ${this.moveCount}`;
+        } else {
+            console.log('moveCounter element not found');
+        }
+        console.log(`Move count updated: ${this.moveCount}`);
+    }
+
+    // Force le repositionnement des contrôles de jeu en dessous de la grille
+    repositionGameControls() {
+        const gameControls = document.getElementById('gameControls');
+        const gridContainer = document.querySelector('.grid-container');
+        
+        if (gameControls && gridContainer) {
+            // Retirer le conteneur de son emplacement actuel
+            if (gameControls.parentNode) {
+                gameControls.parentNode.removeChild(gameControls);
+            }
+            // Le replacer après le grid-container
+            gridContainer.parentNode.insertBefore(gameControls, gridContainer.nextSibling);
+        }
+    }
 }
 
 // Initialiser le jeu quand la page est chargée
@@ -1647,5 +1886,60 @@ window.addEventListener('load', () => {
         btn.style.margin = '8px';
         btn.onclick = () => game.generateRandomPuzzle();
         document.body.insertBefore(btn, document.body.firstChild);
+    }
+    
+    // Ajout du bouton ON/OFF pour l'animation
+    if (!document.getElementById('animationToggleBtn')) {
+        const animBtn = document.createElement('button');
+        animBtn.id = 'animationToggleBtn';
+        animBtn.textContent = 'Animation: OFF';
+        animBtn.style.margin = '8px';
+        animBtn.onclick = () => {
+            const isOn = game.toggleZoneColorAnimation();
+            animBtn.textContent = isOn ? 'Animation: ON' : 'Animation: OFF';
+        };
+        document.body.insertBefore(animBtn, document.body.firstChild);
+    }
+    
+    // Créer un conteneur pour les éléments de jeu en dessous de la grille
+    if (!document.getElementById('gameControls')) {
+        const gameControls = document.createElement('div');
+        gameControls.id = 'gameControls';
+        gameControls.style.margin = '20px 8px';
+        gameControls.style.textAlign = 'center';
+        gameControls.style.position = 'relative';
+        gameControls.style.display = 'block';
+        gameControls.style.width = '100%';
+        gameControls.style.clear = 'both';
+        
+        // Ajout du compteur de coups
+        const moveCounter = document.createElement('div');
+        moveCounter.id = 'moveCounter';
+        moveCounter.textContent = 'Coups: 0';
+        moveCounter.style.margin = '8px';
+        moveCounter.style.fontWeight = 'bold';
+        moveCounter.style.fontSize = '16px';
+        moveCounter.style.display = 'inline-block';
+        
+        // Ajout du bouton retour arrière
+        const undoBtn = document.createElement('button');
+        undoBtn.id = 'undoBtn';
+        undoBtn.textContent = '← Retour arrière';
+        undoBtn.style.margin = '8px';
+        undoBtn.onclick = () => game.undoLastMove();
+        
+        // Ajouter les éléments au conteneur
+        gameControls.appendChild(moveCounter);
+        gameControls.appendChild(undoBtn);
+        
+        // Insérer le conteneur après le grid-container
+        const gridContainer = document.querySelector('.grid-container');
+        if (gridContainer) {
+            // Insérer après le grid-container
+            gridContainer.parentNode.insertBefore(gameControls, gridContainer.nextSibling);
+        } else {
+            // Fallback : insérer à la fin du body
+            document.body.appendChild(gameControls);
+        }
     }
 }); 
