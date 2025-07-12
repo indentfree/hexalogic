@@ -1095,7 +1095,7 @@ class HexGridGame {
         this.updateConstraintColors();
         this.updateZoneBorders();
         this.updateYamlExport();
-        this.startZoneColorAnimation();
+        //this.startZoneColorAnimation();
     }
 
     detectGridSizeFromTextualGrid(textual) {
@@ -1341,7 +1341,7 @@ class HexGridGame {
     getZoneColor(zoneId) {
         if (!zoneId) return null;
         // Générer une palette HSL de 30 couleurs bien réparties
-        const N = 30;
+        const N = 50;
         const palette = [];
         for (let i = 0; i < N; i++) {
             // Décalage pour éviter que 0 et N/2 soient trop proches
@@ -1478,13 +1478,15 @@ class HexGridGame {
             this.updateConstraintColors();
             this.updateYamlExport();
             //this.updateConstraintColors();
-            this.startZoneColorAnimation();
+            //this.startZoneColorAnimation();
         });
     }
 
     // Crée des zones de 2 à maxZoneSize cellules consécutives de même état
     createZonesForCurrentStates(gameCells, N) {
-        const maxZoneSize = Math.max(2, Math.floor(N / 2)+2);
+        //const maxZoneSize = Math.max(2, Math.floor(N / 2)+2);
+        const maxZoneSize = N;
+        
         // Génère des zoneId : A, B, ..., Z, AA, AB, ...
         function* zoneIdGenerator() {
             const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -1583,12 +1585,32 @@ class HexGridGame {
                 // Teinte cyclique selon le temps et le zoneId
                 // Pour chaque zone, un déphasage pour éviter que toutes les zones changent en même temps
                 const base = parseInt(zoneId.replace(/[^0-9A-Z]/g, ''), 36) || 0;
-                const t = ((now / 20) + base * 50) % 360;
+                
+                // Extraire la teinte initiale de la couleur de la zone
+                let initialHue = 0;
+                if (zoneId.startsWith('ISO')) {
+                    // Pour les zones isolées, extraire la teinte de la couleur stockée
+                    const initialColor = this.isolatedZoneColors[zoneId];
+                    if (initialColor) {
+                        const match = initialColor.match(/hsl\((\d+),/);
+                        initialHue = match ? parseInt(match[1]) : 0;
+                    }
+                } else {
+                    // Pour les zones normales, extraire la teinte de getZoneColor
+                    const initialColor = this.getZoneColor(zoneId);
+                    if (initialColor) {
+                        const match = initialColor.match(/hsl\((\d+),/);
+                        initialHue = match ? parseInt(match[1]) : 0;
+                    }
+                }
+                
+                const direction = base % 2 === 0 ? 1 : -1; // Sens alterné selon le zoneId
+                const t = ((now / 100 * direction) + initialHue) % 360;
                 // Style stable par zone - uniquement pastel
                 if (!this.zoneAnimStyle[zoneId]) {
                     this.zoneAnimStyle[zoneId] = {
-                        sat: 70, // Saturation pastel fixe
-                        lum: 80  // Luminosité pastel fixe
+                        sat: 90, // Saturation pastel fixe
+                        lum: 75  // Luminosité pastel fixe
                     };
                 }
                 const {sat, lum} = this.zoneAnimStyle[zoneId];
