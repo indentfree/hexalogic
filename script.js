@@ -201,8 +201,52 @@ class HexGridGame {
         state = (state + 1) % 3;
         hex.dataset.state = state;
         if (state === 0) {
-            const zoneColor = hex.dataset.zoneId ? this.getZoneColor(hex.dataset.zoneId) : '#b2bec3';
-            hex.setAttribute('fill', zoneColor);
+            // Si la cellule a un zoneId, appliquer la même couleur à toute la zone
+            let color;
+            if (hex.dataset.zoneId) {
+                // Récupérer tous les voisins de la zone
+                const allZoneCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"][data-zone-id="' + hex.dataset.zoneId + '"]'));
+                const neighborZoneIds = new Set();
+                allZoneCells.forEach(cell => {
+                    const row = parseInt(cell.dataset.row);
+                    const col = parseInt(cell.dataset.col);
+                    const neighbors = this.getNeighborsByCoords(row, col)
+                        .map(([nrow, ncol]) => this.findCellByCoords(nrow, ncol))
+                        .filter(ncell => ncell && ncell.dataset.zoneId && ncell.dataset.zoneId !== hex.dataset.zoneId);
+                    neighbors.forEach(ncell => neighborZoneIds.add(ncell.dataset.zoneId));
+                });
+                // Récupérer les couleurs des zones voisines
+                const neighborColors = Array.from(neighborZoneIds).map(zid => {
+                    if (zid.startsWith('ISO')) {
+                        return this.isolatedZoneColors && this.isolatedZoneColors[zid] ? this.isolatedZoneColors[zid] : '#b2bec3';
+                    } else {
+                        return this.getZoneColor(zid);
+                    }
+                });
+                color = this.generateDistinctColor(neighborColors);
+                // Appliquer à toutes les cellules de la zone
+                allZoneCells.forEach(cell => {
+                    cell.setAttribute('fill', color);
+                });
+            } else {
+                // Isolée : couleur unique, différente des voisins
+                const row = parseInt(hex.dataset.row);
+                const col = parseInt(hex.dataset.col);
+                const neighbors = this.getNeighborsByCoords(row, col)
+                    .map(([nrow, ncol]) => this.findCellByCoords(nrow, ncol))
+                    .filter(ncell => ncell && ncell.dataset.zoneId && ncell.dataset.zoneId !== hex.dataset.zoneId);
+                const neighborColors = neighbors.map(ncell => {
+                    if (ncell.dataset.zoneId && ncell.dataset.zoneId.startsWith('ISO')) {
+                        return this.isolatedZoneColors && this.isolatedZoneColors[ncell.dataset.zoneId] ? this.isolatedZoneColors[ncell.dataset.zoneId] : '#b2bec3';
+                    } else if (ncell.dataset.zoneId) {
+                        return this.getZoneColor(ncell.dataset.zoneId);
+                    } else {
+                        return '#b2bec3';
+                    }
+                });
+                color = this.generateDistinctColor(neighborColors);
+                hex.setAttribute('fill', color);
+            }
             hex.setAttribute('stroke', 'none');
             hex.setAttribute('stroke-width', '0');
         } else if (state === 1) {
@@ -351,11 +395,32 @@ class HexGridGame {
                 // Déterminer le nouvel état (cycle comme la cellule cliquée)
                 let state = parseInt(hex.dataset.state);
                 const newState = (state + 1) % 3;
+                let color;
+                if (newState === 0) {
+                    // Récupérer tous les voisins de la zone
+                    const neighborZoneIds = new Set();
+                    allZoneCells.forEach(cell => {
+                        const row = parseInt(cell.dataset.row);
+                        const col = parseInt(cell.dataset.col);
+                        const neighbors = this.getNeighborsByCoords(row, col)
+                            .map(([nrow, ncol]) => this.findCellByCoords(nrow, ncol))
+                            .filter(ncell => ncell && ncell.dataset.zoneId && ncell.dataset.zoneId !== zoneId);
+                        neighbors.forEach(ncell => neighborZoneIds.add(ncell.dataset.zoneId));
+                    });
+                    // Récupérer les couleurs des zones voisines
+                    const neighborColors = Array.from(neighborZoneIds).map(zid => {
+                        if (zid.startsWith('ISO')) {
+                            return this.isolatedZoneColors && this.isolatedZoneColors[zid] ? this.isolatedZoneColors[zid] : '#b2bec3';
+                        } else {
+                            return this.getZoneColor(zid);
+                        }
+                    });
+                    color = this.generateDistinctColor(neighborColors);
+                }
                 allZoneCells.forEach(cell => {
                     cell.dataset.state = newState;
                     if (newState === 0) {
-                        const zoneColor = cell.dataset.zoneId ? this.getZoneColor(cell.dataset.zoneId) : '#b2bec3';
-                        cell.setAttribute('fill', zoneColor);
+                        cell.setAttribute('fill', color);
                         cell.setAttribute('stroke', 'none');
                         cell.setAttribute('stroke-width', '0');
                     } else if (newState === 1) {
@@ -1030,6 +1095,7 @@ class HexGridGame {
         this.updateConstraintColors();
         this.updateZoneBorders();
         this.updateYamlExport();
+        this.startZoneColorAnimation();
     }
 
     detectGridSizeFromTextualGrid(textual) {
@@ -1302,6 +1368,34 @@ class HexGridGame {
         return palette[paletteIndex];
     }
 
+    // Génère une couleur aléatoire (vive ou pastel) différente des couleurs voisines (différence de teinte >= 30°)
+    generateDistinctColor(neighborColors) {
+        function getHue(color) {
+            // color format: hsl(hue, ...)
+            const match = color.match(/hsl\((\d+),/);
+            return match ? parseInt(match[1]) : null;
+        }
+        let attempts = 0;
+        while (attempts < 20) {
+            const isPastel = Math.random() < 0.7;
+            const hue = Math.floor(Math.random() * 360);
+            const sat = isPastel ? 70 : 90;
+            const lum = isPastel ? 80 : 55;
+            const color = `hsl(${hue}, ${sat}%, ${lum}%)`;
+            const hueDiffOk = neighborColors.every(c => {
+                const h = getHue(c);
+                if (h === null) return true;
+                let diff = Math.abs(hue - h);
+                if (diff > 180) diff = 360 - diff;
+                return diff >= 30;
+            });
+            if (hueDiffOk) return color;
+            attempts++;
+        }
+        // Si pas trouvé, retourne quand même la dernière couleur
+        return `hsl(${Math.floor(Math.random() * 360)}, 80%, 70%)`;
+    }
+
     // Applique une couleur de contour unique à chaque zoneId (palette), peu importe l'état
     updateZoneBorders() {
         // Supprimer les anciens segments de bordure de zone (s'il y en a)
@@ -1384,6 +1478,7 @@ class HexGridGame {
             this.updateConstraintColors();
             this.updateYamlExport();
             //this.updateConstraintColors();
+            this.startZoneColorAnimation();
         });
     }
 
@@ -1439,7 +1534,10 @@ class HexGridGame {
                 // Zone isolée (taille 1)
                 const isoId = 'ISO' + (isoCount++);
                 const hue = Math.floor(Math.random() * 360);
-                const color = `hsl(${hue}, 70%, 80%)`;
+                // Couleur pastel uniquement
+                const sat = 70; // Saturation pastel
+                const lum = 80; // Luminosité pastel
+                const color = `hsl(${hue}, ${sat}%, ${lum}%)`;
                 this.isolatedZoneColors[isoId] = color;
                 for (const zcell of cluster) {
                     zcell.dataset.zoneId = isoId;
@@ -1457,10 +1555,55 @@ class HexGridGame {
             if (!cell.dataset.zoneId) {
                 const isoId = 'ISO' + (isoCount++);
                 const hue = Math.floor(Math.random() * 360);
-                const color = `hsl(${hue}, 70%, 80%)`;
+                const sat = 70; // Saturation pastel
+                const lum = 80; // Luminosité pastel
+                const color = `hsl(${hue}, ${sat}%, ${lum}%)`;
                 this.isolatedZoneColors[isoId] = color;
                 cell.dataset.zoneId = isoId;
             }
+        }
+    }
+
+    // Animation des couleurs des zones à l'état 0 (GRIS)
+    startZoneColorAnimation() {
+        if (this._zoneColorAnimInterval) return;
+        this.zoneAnimStyle = this.zoneAnimStyle || {};
+        this._zoneColorAnimInterval = setInterval(() => {
+            const now = Date.now();
+            // Regrouper les cellules de jeu à l'état 0 par zoneId
+            const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
+            const zones = {};
+            gameCells.forEach(cell => {
+                if (parseInt(cell.dataset.state) === 0 && cell.dataset.zoneId) {
+                    if (!zones[cell.dataset.zoneId]) zones[cell.dataset.zoneId] = [];
+                    zones[cell.dataset.zoneId].push(cell);
+                }
+            });
+            Object.entries(zones).forEach(([zoneId, cells]) => {
+                // Teinte cyclique selon le temps et le zoneId
+                // Pour chaque zone, un déphasage pour éviter que toutes les zones changent en même temps
+                const base = parseInt(zoneId.replace(/[^0-9A-Z]/g, ''), 36) || 0;
+                const t = ((now / 20) + base * 50) % 360;
+                // Style stable par zone - uniquement pastel
+                if (!this.zoneAnimStyle[zoneId]) {
+                    this.zoneAnimStyle[zoneId] = {
+                        sat: 70, // Saturation pastel fixe
+                        lum: 80  // Luminosité pastel fixe
+                    };
+                }
+                const {sat, lum} = this.zoneAnimStyle[zoneId];
+                const color = `hsl(${Math.floor(t)}, ${sat}%, ${lum}%)`;
+                cells.forEach(cell => {
+                    cell.setAttribute('fill', color);
+                });
+            });
+        }, 60); // 60 ms pour une animation fluide
+    }
+
+    stopZoneColorAnimation() {
+        if (this._zoneColorAnimInterval) {
+            clearInterval(this._zoneColorAnimInterval);
+            this._zoneColorAnimInterval = null;
         }
     }
 }
