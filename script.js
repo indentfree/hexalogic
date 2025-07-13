@@ -147,7 +147,7 @@ class HexGridGame {
         if (msgDiv) msgDiv.style.display = 'none';
         
         // Réinitialiser le compteur de coups si c'est une nouvelle grille (pas un resize)
-        if (!callback || callback.toString().includes('resize')) {
+        if (!callback || !callback.toString().includes('resize')) {
             this.moveCount = 0;
             this.moveHistory = [];
             this.updateMoveCounter();
