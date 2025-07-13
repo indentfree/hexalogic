@@ -19,6 +19,11 @@ class HexGridGame {
         // Système de suivi des coups
         this.moveCount = 0;
         this.moveHistory = [];
+        
+        // Système de graines déterministes
+        this.currentSeed = null;
+        this.currentGameId = null;
+        
         this.bindEvents();
         // NE PAS générer la grille ici, attendre window.onload
         this.bindModeToggle();
@@ -1527,6 +1532,14 @@ class HexGridGame {
         this.moveCount = 0;
         this.moveHistory = [];
         this.updateMoveCounter();
+        
+        // Effacer l'ID_JEU actuel
+        this.currentGameId = null;
+        this.currentSeed = null;
+        
+        // Mettre à jour l'affichage de l'ID
+        this.updateGameIdDisplay();
+        
         this.generateGrid(() => {
             // 1. Mettre toutes les cellules de jeu à un état aléatoire (NOIR ou BLANC)
             const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
@@ -1567,6 +1580,77 @@ class HexGridGame {
                 cell.setAttribute('stroke', 'none');
                 cell.setAttribute('stroke-width', '0');
             });
+            // 6. Mettre à jour l'affichage des contraintes et l'export YAML
+            this.updateConstraintTexts();
+            // Remettre à 0 toutes les valeurs actual_black des contraintes
+            const constraintCells2 = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
+            constraintCells2.forEach(cell => { cell.dataset.actual_black = 0; });
+            this.updateConstraintColors();
+            this.updateYamlExport();
+            //this.updateConstraintColors();
+            // Animation désactivée par défaut
+            // this.startZoneColorAnimation();
+            
+            // S'assurer que les contrôles de jeu sont bien positionnés
+            this.repositionGameControls();
+        });
+    }
+
+    // Génère une grille déterministe basée sur une graine
+    generateSeededPuzzle(seed) {
+        // Réinitialiser le compteur de coups
+        this.moveCount = 0;
+        this.moveHistory = [];
+        this.updateMoveCounter();
+        
+        // Créer un générateur de nombres aléatoires basé sur la graine
+        const random = this.seededRandom(seed);
+        
+        this.generateGrid(() => {
+            // 1. Mettre toutes les cellules de jeu à un état déterministe (NOIR ou BLANC)
+            const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
+            gameCells.forEach(cell => {
+                // Utiliser le générateur déterministe au lieu de Math.random()
+                const state = random() < 0.5 ? 1 : 2;
+                cell.dataset.state = state;
+                if (state === 1) {
+                    cell.setAttribute('fill', '#222');
+                } else {
+                    cell.setAttribute('fill', '#fff');
+                }
+                cell.setAttribute('stroke', 'none');
+                cell.setAttribute('stroke-width', '0');
+                delete cell.dataset.zoneId;
+            });
+            
+            // 2. Créer les zones de 2 à N/2 cellules consécutives de même état
+            this.createZonesForCurrentStates(gameCells, this.gridSize);
+            
+            // 3. Mettre à jour actual_black pour chaque contrainte
+            this.updateAllActualBlack();
+            
+            // 4. Copier actual_black dans expected_black pour chaque contrainte
+            const constraintCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
+            constraintCells.forEach(cell => {
+                cell.dataset.expected_black = cell.dataset.actual_black;
+            });
+            
+            // 5. Remettre toutes les cellules de jeu à GRIS
+            gameCells.forEach(cell => {
+                cell.dataset.state = 0;
+                let fillColor;
+                if (cell.dataset.zoneId && cell.dataset.zoneId.startsWith('ISO')) {
+                    fillColor = this.isolatedZoneColors[cell.dataset.zoneId];
+                } else if (cell.dataset.zoneId) {
+                    fillColor = this.getZoneColor(cell.dataset.zoneId);
+                } else {
+                    fillColor = '#b2bec3'; // fallback gris si jamais
+                }
+                cell.setAttribute('fill', fillColor);
+                cell.setAttribute('stroke', 'none');
+                cell.setAttribute('stroke-width', '0');
+            });
+            
             // 6. Mettre à jour l'affichage des contraintes et l'export YAML
             this.updateConstraintTexts();
             // Remettre à 0 toutes les valeurs actual_black des contraintes
@@ -1853,6 +1937,20 @@ class HexGridGame {
         console.log(`Move count updated: ${this.moveCount}`);
     }
 
+    // Met à jour l'affichage de l'ID du jeu
+    updateGameIdDisplay() {
+        const gameIdDisplay = document.getElementById('gameIdDisplay');
+        if (gameIdDisplay) {
+            if (this.currentGameId) {
+                gameIdDisplay.textContent = `ID: ${this.currentGameId}`;
+                gameIdDisplay.style.color = '#333';
+            } else {
+                gameIdDisplay.textContent = 'ID: Aléatoire';
+                gameIdDisplay.style.color = '#666';
+            }
+        }
+    }
+
     // Force le repositionnement des contrôles de jeu en dessous de la grille
     repositionGameControls() {
         const gameControls = document.getElementById('gameControls');
@@ -1867,13 +1965,95 @@ class HexGridGame {
             gridContainer.parentNode.insertBefore(gameControls, gridContainer.nextSibling);
         }
     }
+
+    // Génère une graine à partir d'un numéro de jeu
+    generateSeedFromGameNumber(gameNumber) {
+        // Hash simple mais déterministe
+        let hash = 0;
+        const str = gameNumber.toString();
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        return Math.abs(hash);
+    }
+
+    // Parse un ID_JEU (ex: "5-42")
+    parseGameId(gameId) {
+        const match = gameId.match(/^(\d+)-(\d+)$/);
+        if (!match) {
+            throw new Error(`Format d'ID_JEU invalide: ${gameId}. Format attendu: taille-numero`);
+        }
+        return {
+            size: parseInt(match[1]),
+            gameNumber: parseInt(match[2])
+        };
+    }
+
+    // Génère une grille à partir d'un ID_JEU
+    generateGridFromGameId(gameId) {
+        try {
+            const { size, gameNumber } = this.parseGameId(gameId);
+            const seed = this.generateSeedFromGameNumber(gameNumber);
+            
+            this.currentGameId = gameId;
+            this.currentSeed = seed;
+            this.gridSize = size;
+            
+            console.log(`Génération de la grille ${gameId} avec la graine ${seed}`);
+            
+            // Mettre à jour l'URL
+            this.updateUrlWithGameId(gameId);
+            
+            // Mettre à jour l'affichage de l'ID
+            this.updateGameIdDisplay();
+            
+            // Générer la grille avec la graine
+            this.generateSeededPuzzle(seed);
+            
+        } catch (error) {
+            console.error('Erreur lors de la génération de la grille:', error.message);
+            // Fallback vers une grille aléatoire
+            this.generateRandomPuzzle();
+        }
+    }
+
+    // Met à jour l'URL avec l'ID_JEU
+    updateUrlWithGameId(gameId) {
+        const url = new URL(window.location);
+        url.searchParams.set('game', gameId);
+        window.history.replaceState({}, '', url);
+    }
+
+    // Récupère l'ID_JEU depuis l'URL
+    getGameIdFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('game');
+    }
+
+    // Générateur de nombres aléatoires basé sur une graine
+    seededRandom(seed) {
+        // Implémentation simple d'un générateur de nombres aléatoires
+        let state = seed;
+        return function() {
+            state = (state * 9301 + 49297) % 233280;
+            return state / 233280;
+        };
+    }
 }
 
 // Initialiser le jeu quand la page est chargée
 window.addEventListener('load', () => {
     const game = new HexGridGame();
     game.populateGridSelector();
-    if (window.GRIDS_DEFINITION && window.GRIDS_DEFINITION.length > 0) {
+    
+    // Vérifier s'il y a un ID_JEU dans l'URL
+    const gameIdFromUrl = game.getGameIdFromUrl();
+    if (gameIdFromUrl) {
+        console.log(`Chargement de la grille depuis l'URL: ${gameIdFromUrl}`);
+        game.generateGridFromGameId(gameIdFromUrl);
+    } else if (window.GRIDS_DEFINITION && window.GRIDS_DEFINITION.length > 0) {
         game.loadGridFromConf(window.GRIDS_DEFINITION[0]);
     } else {
         game.generateGrid();
@@ -1886,6 +2066,21 @@ window.addEventListener('load', () => {
         btn.style.margin = '8px';
         btn.onclick = () => game.generateRandomPuzzle();
         document.body.insertBefore(btn, document.body.firstChild);
+    }
+    
+    // Ajout du bouton pour générer une grille par ID
+    if (!document.getElementById('generateByIdBtn')) {
+        const idBtn = document.createElement('button');
+        idBtn.id = 'generateByIdBtn';
+        idBtn.textContent = 'Générer par ID (ex: 5-42)';
+        idBtn.style.margin = '8px';
+        idBtn.onclick = () => {
+            const gameId = prompt('Entrez l\'ID du jeu (format: taille-numero, ex: 5-42):');
+            if (gameId && gameId.trim()) {
+                game.generateGridFromGameId(gameId.trim());
+            }
+        };
+        document.body.insertBefore(idBtn, document.body.firstChild);
     }
     
     // Ajout du bouton ON/OFF pour l'animation
@@ -1912,6 +2107,15 @@ window.addEventListener('load', () => {
         gameControls.style.width = '100%';
         gameControls.style.clear = 'both';
         
+        // Ajout de l'ID du jeu actuel
+        const gameIdDisplay = document.createElement('div');
+        gameIdDisplay.id = 'gameIdDisplay';
+        gameIdDisplay.textContent = 'ID: Aucun';
+        gameIdDisplay.style.margin = '8px';
+        gameIdDisplay.style.fontSize = '14px';
+        gameIdDisplay.style.color = '#666';
+        gameIdDisplay.style.display = 'inline-block';
+        
         // Ajout du compteur de coups
         const moveCounter = document.createElement('div');
         moveCounter.id = 'moveCounter';
@@ -1929,6 +2133,7 @@ window.addEventListener('load', () => {
         undoBtn.onclick = () => game.undoLastMove();
         
         // Ajouter les éléments au conteneur
+        gameControls.appendChild(gameIdDisplay);
         gameControls.appendChild(moveCounter);
         gameControls.appendChild(undoBtn);
         
