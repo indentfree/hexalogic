@@ -75,6 +75,9 @@ class HexGridGame {
         
         // Responsive : régénérer la grille à chaque resize
         window.addEventListener('resize', () => this.resizeGrid());
+        
+        // Gestion du menu hamburger
+        this.bindHamburgerMenu();
     }
     
     // Redimensionnement de la grille en préservant l'état des cellules
@@ -372,6 +375,11 @@ class HexGridGame {
             this.updateYamlExport();
         }
         this.updateZoneBorders();
+        
+        // Vérifier la progression si on est en mode jeu
+        if (this.mode === 'game') {
+            this.checkAndSaveProgress();
+        }
     }
     
     updateDisplay() {
@@ -526,12 +534,17 @@ class HexGridGame {
                         cell.setAttribute('stroke-width', '0');
                     }
                 });
-                // Mettre à jour les contraintes une seule fois
-                this.updateAllActualBlack();
-                this.updateConstraintColors();
-                if (this.mode === 'edit') {
-                    this.updateYamlExport();
-                }
+                            // Mettre à jour les contraintes une seule fois
+            this.updateAllActualBlack();
+            this.updateConstraintColors();
+            if (this.mode === 'edit') {
+                this.updateYamlExport();
+            }
+            
+            // Vérifier la progression si on est en mode jeu
+            if (this.mode === 'game') {
+                this.checkAndSaveProgress();
+            }
             } else {
                 this.cycleHexState(hex);
             }
@@ -1949,6 +1962,21 @@ class HexGridGame {
                 gameIdDisplay.style.color = '#666';
             }
         }
+        
+        // Mettre à jour le titre
+        this.updatePageTitle();
+    }
+
+    // Met à jour le titre de la page
+    updatePageTitle() {
+        const titleElement = document.querySelector('h1');
+        if (titleElement) {
+            if (this.currentGameId) {
+                titleElement.textContent = `HexaLogic - ${this.currentGameId}`;
+            } else {
+                titleElement.textContent = 'HexaLogic';
+            }
+        }
     }
 
     // Force le repositionnement des contrôles de jeu en dessous de la grille
@@ -2041,6 +2069,205 @@ class HexGridGame {
             return state / 233280;
         };
     }
+
+    // Gestion du menu hamburger
+    bindHamburgerMenu() {
+        const hamburgerIcon = document.getElementById('hamburgerIcon');
+        const menuOverlay = document.getElementById('menuOverlay');
+        const menuButtons = document.querySelectorAll('.menu-btn');
+
+        // Toggle du menu
+        hamburgerIcon.addEventListener('click', () => {
+            this.toggleMenu();
+            this.updateMenuProgress();
+        });
+
+        // Fermer le menu en cliquant sur l'overlay
+        menuOverlay.addEventListener('click', (e) => {
+            if (e.target === menuOverlay) {
+                this.closeMenu();
+            }
+        });
+
+        // Gestion des boutons du menu
+        menuButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const action = btn.dataset.action;
+                const size = btn.dataset.size;
+                
+                switch (action) {
+                    case 'grid':
+                        this.generateGridBySize(parseInt(size));
+                        break;
+                    case 'random':
+                        this.generateRandomPuzzle();
+                        break;
+                    case 'custom-id':
+                        this.promptForGameId();
+                        break;
+                    case 'toggle-mode':
+                        this.toggleMode();
+                        break;
+                    case 'toggle-animation':
+                        this.toggleAnimation();
+                        break;
+                    case 'close':
+                        this.closeMenu();
+                        break;
+                }
+            });
+        });
+    }
+
+    // Génère une grille de taille spécifique
+    generateGridBySize(size) {
+        this.gridSize = size;
+        
+        // Récupérer le dernier niveau complété pour cette taille
+        const lastCompleted = this.getLastCompletedLevel(size);
+        const nextLevel = lastCompleted + 1;
+        
+        // Générer la grille avec le niveau suivant
+        const gameId = `${size}-${nextLevel}`;
+        this.generateGridFromGameId(gameId);
+        
+        this.closeMenu();
+    }
+
+    // Demande un ID de jeu
+    promptForGameId() {
+        const gameId = prompt('Entrez l\'ID du jeu (format: taille-numero, ex: 5-42):');
+        if (gameId && gameId.trim()) {
+            this.generateGridFromGameId(gameId.trim());
+        }
+        this.closeMenu();
+    }
+
+    // Bascule le mode EDIT/GAME
+    toggleMode() {
+        this.mode = this.mode === 'edit' ? 'game' : 'edit';
+        this.updateModeButton();
+        this.setYamlExportVisibility();
+        this.setControlsVisibility();
+        this.closeMenu();
+    }
+
+    // Bascule l'animation
+    toggleAnimation() {
+        const isOn = this.toggleZoneColorAnimation();
+        this.updateAnimationButton(isOn);
+        this.closeMenu();
+    }
+
+    // Ouvre le menu
+    openMenu() {
+        const hamburgerIcon = document.getElementById('hamburgerIcon');
+        const menuOverlay = document.getElementById('menuOverlay');
+        hamburgerIcon.classList.add('active');
+        menuOverlay.classList.add('active');
+    }
+
+    // Ferme le menu
+    closeMenu() {
+        const hamburgerIcon = document.getElementById('hamburgerIcon');
+        const menuOverlay = document.getElementById('menuOverlay');
+        hamburgerIcon.classList.remove('active');
+        menuOverlay.classList.remove('active');
+    }
+
+    // Toggle le menu
+    toggleMenu() {
+        const menuOverlay = document.getElementById('menuOverlay');
+        if (menuOverlay.classList.contains('active')) {
+            this.closeMenu();
+        } else {
+            this.openMenu();
+        }
+    }
+
+    // Met à jour le bouton du mode
+    updateModeButton() {
+        const modeBtn = document.querySelector('[data-action="toggle-mode"]');
+        if (modeBtn) {
+            modeBtn.textContent = this.mode === 'edit' ? 'Mode GAME' : 'Mode EDIT';
+        }
+    }
+
+    // Met à jour le bouton de l'animation
+    updateAnimationButton(isOn) {
+        const animBtn = document.querySelector('[data-action="toggle-animation"]');
+        if (animBtn) {
+            animBtn.textContent = isOn ? 'Animation OFF' : 'Animation ON';
+        }
+    }
+
+    // Met à jour l'affichage de la progression dans le menu
+    updateMenuProgress() {
+        const sizes = [3, 4, 5, 7, 9];
+        
+        sizes.forEach(size => {
+            const btn = document.querySelector(`[data-action="grid"][data-size="${size}"]`);
+            if (btn) {
+                const lastCompleted = this.getLastCompletedLevel(size);
+                const nextLevel = lastCompleted + 1;
+                btn.textContent = `Grille d'ordre ${size} (Niveau ${nextLevel})`;
+                
+                // Ajouter un indicateur visuel si des niveaux sont complétés
+                if (lastCompleted > 0) {
+                    btn.style.background = '#e8f5e8';
+                    btn.style.borderColor = '#28a745';
+                } else {
+                    btn.style.background = '#f8f9fa';
+                    btn.style.borderColor = '#dee2e6';
+                }
+            }
+        });
+    }
+
+    // Récupère le dernier niveau complété pour une taille donnée
+    getLastCompletedLevel(size) {
+        const key = `hexalogic_completed_${size}`;
+        const completed = localStorage.getItem(key);
+        return completed ? parseInt(completed) : 0;
+    }
+
+    // Enregistre un niveau complété
+    saveCompletedLevel(size, level) {
+        const key = `hexalogic_completed_${size}`;
+        const currentMax = this.getLastCompletedLevel(size);
+        
+        // Ne sauvegarder que si c'est un nouveau record
+        if (level > currentMax) {
+            localStorage.setItem(key, level.toString());
+            console.log(`Niveau ${size}-${level} complété ! Nouveau record pour la taille ${size}`);
+            return true;
+        }
+        return false;
+    }
+
+    // Vérifie si une grille est complétée et sauvegarde la progression
+    checkAndSaveProgress() {
+        if (!this.currentGameId) return;
+        
+        const { size, gameNumber } = this.parseGameId(this.currentGameId);
+        
+        // Vérifier si toutes les contraintes sont satisfaites
+        const constraintCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
+        const allConstraintsMet = constraintCells.every(cell => {
+            const expected = parseInt(cell.dataset.expected_black || '0');
+            const actual = parseInt(cell.dataset.actual_black || '0');
+            return expected === actual;
+        });
+        
+        if (allConstraintsMet) {
+            const isNewRecord = this.saveCompletedLevel(size, gameNumber);
+            if (isNewRecord) {
+                this.showVictoryMessage(true);
+            } else {
+                this.showVictoryMessage(false);
+            }
+        }
+    }
 }
 
 // Initialiser le jeu quand la page est chargée
@@ -2058,43 +2285,11 @@ window.addEventListener('load', () => {
     } else {
         game.generateGrid();
     }
-    // Ajout du bouton si pas déjà présent
-    if (!document.getElementById('randomPuzzleBtn')) {
-        const btn = document.createElement('button');
-        btn.id = 'randomPuzzleBtn';
-        btn.textContent = 'Générer une grille aléatoire cohérente';
-        btn.style.margin = '8px';
-        btn.onclick = () => game.generateRandomPuzzle();
-        document.body.insertBefore(btn, document.body.firstChild);
-    }
-    
-    // Ajout du bouton pour générer une grille par ID
-    if (!document.getElementById('generateByIdBtn')) {
-        const idBtn = document.createElement('button');
-        idBtn.id = 'generateByIdBtn';
-        idBtn.textContent = 'Générer par ID (ex: 5-42)';
-        idBtn.style.margin = '8px';
-        idBtn.onclick = () => {
-            const gameId = prompt('Entrez l\'ID du jeu (format: taille-numero, ex: 5-42):');
-            if (gameId && gameId.trim()) {
-                game.generateGridFromGameId(gameId.trim());
-            }
-        };
-        document.body.insertBefore(idBtn, document.body.firstChild);
-    }
-    
-    // Ajout du bouton ON/OFF pour l'animation
-    if (!document.getElementById('animationToggleBtn')) {
-        const animBtn = document.createElement('button');
-        animBtn.id = 'animationToggleBtn';
-        animBtn.textContent = 'Animation: OFF';
-        animBtn.style.margin = '8px';
-        animBtn.onclick = () => {
-            const isOn = game.toggleZoneColorAnimation();
-            animBtn.textContent = isOn ? 'Animation: ON' : 'Animation: OFF';
-        };
-        document.body.insertBefore(animBtn, document.body.firstChild);
-    }
+    // Initialisation des boutons du menu
+    game.updateModeButton();
+    game.updateAnimationButton(false);
+    game.updateGameIdDisplay();
+    game.updateMenuProgress();
     
     // Créer un conteneur pour les éléments de jeu en dessous de la grille
     if (!document.getElementById('gameControls')) {

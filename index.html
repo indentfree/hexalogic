@@ -9,7 +9,36 @@
     <meta name="theme-color" content="#667eea">
 </head>
 <body>
-    <button id="toggleModeBtn">Mode: Edit</button>
+    <!-- Menu hamburger -->
+    <div class="hamburger-menu">
+        <div class="hamburger-icon" id="hamburgerIcon">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+        <div class="menu-overlay" id="menuOverlay">
+            <div class="menu-content">
+                <h3>Menu</h3>
+                <div class="menu-section">
+                    <h4>Grilles prédéfinies</h4>
+                    <button class="menu-btn" data-action="grid" data-size="3">Grille d'ordre 3</button>
+                    <button class="menu-btn" data-action="grid" data-size="4">Grille d'ordre 4</button>
+                    <button class="menu-btn" data-action="grid" data-size="5">Grille d'ordre 5</button>
+                    <button class="menu-btn" data-action="grid" data-size="7">Grille d'ordre 7</button>
+                    <button class="menu-btn" data-action="grid" data-size="9">Grille d'ordre 9</button>
+                </div>
+                <div class="menu-section">
+                    <h4>Actions</h4>
+                    <button class="menu-btn" data-action="random">Grille aléatoire</button>
+                    <button class="menu-btn" data-action="custom-id">Saisir un ID</button>
+                    <button class="menu-btn" data-action="toggle-mode">Mode EDIT</button>
+                    <button class="menu-btn" data-action="toggle-animation">Animation ON/OFF</button>
+                </div>
+                <button class="menu-btn close-btn" data-action="close">Fermer le menu</button>
+            </div>
+        </div>
+    </div>
+
     <select id="gridSelector" style="display:none;"></select>
     <div style="display: flex; align-items: flex-start; gap: 24px;">
         <div id="hexGridContainer">
