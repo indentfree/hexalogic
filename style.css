@@ -436,3 +436,23 @@ body > div[style*='display: flex'] {
         left: 15px;
     }
 } 
+
+/* Style pour la combo dans le menu hamburger */
+#gridSelector {
+    display: block;
+    width: 100%;
+    padding: 12px 15px;
+    margin: 8px 0;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    color: #333;
+    font-size: 14px;
+    transition: 0.2s;
+    box-sizing: border-box;
+}
+#gridSelector:focus {
+    outline: none;
+    border-color: #667eea;
+    background: #eef2fb;
+} 

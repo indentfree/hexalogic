@@ -20,12 +20,18 @@
             <div class="menu-content">
                 <h3>Menu</h3>
                 <div class="menu-section">
-                    <h4>Grilles prédéfinies</h4>
+                    <h4>Grilles de jeu</h4>
                     <button class="menu-btn" data-action="grid" data-size="3">Grille d'ordre 3</button>
                     <button class="menu-btn" data-action="grid" data-size="4">Grille d'ordre 4</button>
                     <button class="menu-btn" data-action="grid" data-size="5">Grille d'ordre 5</button>
+                    <button class="menu-btn" data-action="grid" data-size="6">Grille d'ordre 6</button>
                     <button class="menu-btn" data-action="grid" data-size="7">Grille d'ordre 7</button>
+                    <button class="menu-btn" data-action="grid" data-size="8">Grille d'ordre 8</button>
                     <button class="menu-btn" data-action="grid" data-size="9">Grille d'ordre 9</button>
+                </div>
+                <div class="menu-section">
+                    <h4>Grilles de prédéfinies</h4>
+                    <select id="gridSelector"></select>
                 </div>
                 <div class="menu-section">
                     <h4>Actions</h4>
@@ -39,7 +45,6 @@
         </div>
     </div>
 
-    <select id="gridSelector" style="display:none;"></select>
     <div style="display: flex; align-items: flex-start; gap: 24px;">
         <div id="hexGridContainer">
             <div class="container">
