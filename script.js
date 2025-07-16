@@ -1329,6 +1329,7 @@ class HexGridGame {
                 }
             }
         });
+        this.updateHintBtn && this.updateHintBtn();
         this.updateConstraintColors();
     }
 
@@ -2260,12 +2261,14 @@ class HexGridGame {
         hamburgerIcon.addEventListener('click', () => {
             this.toggleMenu();
             this.updateMenuProgress();
+            this.updateHintBtn && this.updateHintBtn();
         });
 
         // Fermer le menu en cliquant sur l'overlay
         menuOverlay.addEventListener('click', (e) => {
             if (e.target === menuOverlay) {
                 this.closeMenu();
+                this.updateHintBtn && this.updateHintBtn();
             }
         });
 
@@ -2318,6 +2321,25 @@ class HexGridGame {
                 menuOverlay.appendChild(debugBtn);
             }
         }
+        // Ajouter le bouton HINT si pas déjà présent
+        let hintBtn = document.getElementById('hintBtn');
+        if (!hintBtn) {
+            hintBtn = document.createElement('button');
+            hintBtn.id = 'hintBtn';
+            hintBtn.className = 'menu-btn';
+            hintBtn.style.background = '#f8f9fa';
+            hintBtn.style.color = '#333';
+            hintBtn.style.fontWeight = 'bold';
+            hintBtn.onclick = () => { this.showHint(); };
+            // Ajouter dans la dernière section du menu hamburger
+            const menuSections = document.querySelectorAll('.menu-section');
+            if (menuSections.length > 0) {
+                menuSections[menuSections.length - 1].appendChild(hintBtn);
+            } else {
+                menuOverlay.appendChild(hintBtn);
+            }
+        }
+        this.updateHintBtn && this.updateHintBtn();
     }
 
     // Génère une grille de taille spécifique
@@ -2541,6 +2563,113 @@ class HexGridGame {
             <div><b>cellCount</b> : ${constraint.dataset.cell_count}</div>
         `;
         popup.appendChild(infos);
+        popup.style.display = '';
+    }
+
+    updateHintBtn() {
+        const hintBtn = document.getElementById('hintBtn');
+        if (!hintBtn) return;
+        const constraints = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
+        let nbHint = 0;
+        constraints.forEach(constraint => {
+            const actualWhite = parseInt(constraint.dataset.actual_white || '0');
+            const actualBlack = parseInt(constraint.dataset.actual_black || '0');
+            const expectedBlack = parseInt(constraint.dataset.expected_black || '0');
+            const cellCount = parseInt(constraint.dataset.cell_count || '0');
+            if (
+                ((actualWhite === (cellCount - expectedBlack)) || (actualBlack === expectedBlack)) &&
+                (actualWhite + expectedBlack < cellCount)
+            ) {
+                nbHint++;
+            }
+        });
+        hintBtn.textContent = `HINT (${nbHint})`;
+    }
+
+    showHint() {
+        const constraints = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
+        const eligible = constraints.filter(constraint => {
+            const actualWhite = parseInt(constraint.dataset.actual_white || '0');
+            const actualBlack = parseInt(constraint.dataset.actual_black || '0');
+            const expectedBlack = parseInt(constraint.dataset.expected_black || '0');
+            const cellCount = parseInt(constraint.dataset.cell_count || '0');
+            return (
+                ((actualWhite === (cellCount - expectedBlack)) || (actualBlack === expectedBlack)) &&
+                (actualWhite + expectedBlack < cellCount)
+            );
+        });
+        if (eligible.length === 0) {
+            this.showHintPopup && this.showHintPopup("Aucun indice disponible");
+            return;
+        }
+        // Choisir une contrainte au hasard
+        const chosen = eligible[Math.floor(Math.random() * eligible.length)];
+        if (chosen && chosen.dataset.constraintId) {
+            const type = chosen.dataset.constraintId[0];
+            const val = parseInt(chosen.dataset.constraintId.slice(1));
+            this.highlightGameCellsByConstraint(type, val);
+        }
+    }
+
+    showHintPopup(msg) {
+        let popup = document.getElementById('hintPopup');
+        if (!popup) {
+            popup = document.createElement('div');
+            popup.id = 'hintPopup';
+            popup.style.position = 'fixed';
+            popup.style.top = '50%';
+            popup.style.left = '50%';
+            popup.style.transform = 'translate(-50%, -50%)';
+            popup.style.background = 'rgba(44,62,80,0.92)';
+            popup.style.color = 'white';
+            popup.style.padding = '24px 32px';
+            popup.style.fontSize = '1em';
+            popup.style.borderRadius = '12px';
+            popup.style.zIndex = 3000;
+            popup.style.boxShadow = '0 8px 32px rgba(0,0,0,0.25)';
+            popup.style.textAlign = 'center';
+            popup.style.minWidth = '260px';
+            popup.style.maxWidth = '90vw';
+            popup.style.maxHeight = '80vh';
+            popup.style.overflow = 'auto';
+            // Bouton X pour fermer
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '✕';
+            closeBtn.style.position = 'absolute';
+            closeBtn.style.top = '8px';
+            closeBtn.style.right = '16px';
+            closeBtn.style.background = 'transparent';
+            closeBtn.style.color = 'white';
+            closeBtn.style.fontSize = '1.2em';
+            closeBtn.style.border = 'none';
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.style.zIndex = 3100;
+            closeBtn.onclick = () => { popup.style.display = 'none'; };
+            popup.appendChild(closeBtn);
+            document.body.appendChild(popup);
+        }
+        popup.innerHTML = '';
+        // Bouton X
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '✕';
+        closeBtn.style.position = 'absolute';
+        closeBtn.style.top = '8px';
+        closeBtn.style.right = '16px';
+        closeBtn.style.background = 'transparent';
+        closeBtn.style.color = 'white';
+        closeBtn.style.fontSize = '1.2em';
+        closeBtn.style.border = 'none';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.zIndex = 3100;
+        closeBtn.onclick = () => { popup.style.display = 'none'; };
+        popup.appendChild(closeBtn);
+        // Message
+        const msgDiv = document.createElement('div');
+        msgDiv.textContent = msg;
+        msgDiv.style.margin = '32px 0 16px 0';
+        msgDiv.style.fontWeight = 'bold';
+        msgDiv.style.fontSize = '1em';
+        popup.appendChild(msgDiv);
         popup.style.display = '';
     }
 }
