@@ -1343,23 +1343,117 @@ class HexGridGame {
             msgDiv = document.createElement('div');
             msgDiv.id = 'victoryMsg';
             msgDiv.style.position = 'fixed';
-            msgDiv.style.top = '20px';
-            msgDiv.style.right = '20px';
-            msgDiv.style.background = '#27ae60';
+            msgDiv.style.top = '50%';
+            msgDiv.style.left = '50%';
+            msgDiv.style.transform = 'translate(-50%, -50%)';
+            msgDiv.style.background = 'rgba(39,174,96,0.75)';
             msgDiv.style.color = 'white';
-            msgDiv.style.padding = '16px 32px';
-            msgDiv.style.fontSize = '2em';
-            msgDiv.style.borderRadius = '12px';
-            msgDiv.style.zIndex = 1000;
+            msgDiv.style.padding = '32px 48px 32px 48px';
+            msgDiv.style.fontSize = '1em';
+            msgDiv.style.borderRadius = '18px';
+            msgDiv.style.zIndex = 2000;
             msgDiv.style.display = 'none';
+            msgDiv.style.boxShadow = '0 8px 32px rgba(0,0,0,0.25)';
+            msgDiv.style.textAlign = 'center';
+            msgDiv.style.minWidth = '320px';
+            msgDiv.style.maxWidth = '90vw';
+            msgDiv.style.maxHeight = '80vh';
+            msgDiv.style.overflow = 'auto';
+            // Bouton X pour fermer
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '✕';
+            closeBtn.style.position = 'absolute';
+            closeBtn.style.top = '12px';
+            closeBtn.style.right = '18px';
+            closeBtn.style.background = 'transparent';
+            closeBtn.style.color = 'white';
+            closeBtn.style.fontSize = '1.5em';
+            closeBtn.style.border = 'none';
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.style.zIndex = 2100;
+            closeBtn.onclick = () => { msgDiv.style.display = 'none'; };
+            msgDiv.appendChild(closeBtn);
+            // Bouton NEXT
+            const nextBtn = document.createElement('button');
+            nextBtn.id = 'nextLevelBtn';
+            nextBtn.textContent = 'NEXT →';
+            nextBtn.style.marginTop = '32px';
+            nextBtn.style.padding = '12px 32px';
+            nextBtn.style.fontSize = '1.2em';
+            nextBtn.style.background = '#fff';
+            nextBtn.style.color = '#27ae60';
+            nextBtn.style.border = 'none';
+            nextBtn.style.borderRadius = '8px';
+            nextBtn.style.cursor = 'pointer';
+            nextBtn.style.fontWeight = 'bold';
+            nextBtn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.10)';
+            nextBtn.onmouseenter = () => { nextBtn.style.background = '#e8f5e8'; };
+            nextBtn.onmouseleave = () => { nextBtn.style.background = '#fff'; };
+            nextBtn.onclick = () => {
+                msgDiv.style.display = 'none';
+                this.goToNextLevel && this.goToNextLevel();
+            };
+            msgDiv.appendChild(nextBtn);
             document.body.appendChild(msgDiv);
         }
         if (allOk) {
-            msgDiv.textContent = 'Gagné !';
+            // Nettoyer le contenu sauf les boutons
+            msgDiv.innerHTML = '';
+            // Bouton X
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '✕';
+            closeBtn.style.position = 'absolute';
+            closeBtn.style.top = '12px';
+            closeBtn.style.right = '18px';
+            closeBtn.style.background = 'transparent';
+            closeBtn.style.color = 'white';
+            closeBtn.style.fontSize = '1.5em';
+            closeBtn.style.border = 'none';
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.style.zIndex = 2100;
+            closeBtn.onclick = () => { msgDiv.style.display = 'none'; };
+            msgDiv.appendChild(closeBtn);
+            // Message
+            const msg = document.createElement('div');
+            msg.textContent = 'Gagné !';
+            msg.style.margin = '32px 0 16px 0';
+            msg.style.fontWeight = 'bold';
+            msg.style.fontSize = '1em';
+            msgDiv.appendChild(msg);
+            // Bouton NEXT
+            const nextBtn = document.createElement('button');
+            nextBtn.id = 'nextLevelBtn';
+            nextBtn.textContent = 'NEXT →';
+            nextBtn.style.marginTop = '32px';
+            nextBtn.style.padding = '12px 32px';
+            nextBtn.style.fontSize = '1.2em';
+            nextBtn.style.background = '#fff';
+            nextBtn.style.color = '#27ae60';
+            nextBtn.style.border = 'none';
+            nextBtn.style.borderRadius = '8px';
+            nextBtn.style.cursor = 'pointer';
+            nextBtn.style.fontWeight = 'bold';
+            nextBtn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.10)';
+            nextBtn.onmouseenter = () => { nextBtn.style.background = '#e8f5e8'; };
+            nextBtn.onmouseleave = () => { nextBtn.style.background = '#fff'; };
+            nextBtn.onclick = () => {
+                msgDiv.style.display = 'none';
+                this.goToNextLevel && this.goToNextLevel();
+            };
+            msgDiv.appendChild(nextBtn);
             msgDiv.style.display = '';
         } else {
             msgDiv.style.display = 'none';
         }
+    }
+
+    // Aller au niveau suivant
+    goToNextLevel() {
+        if (!this.currentGameId) return;
+        const { size, gameNumber } = this.parseGameId(this.currentGameId);
+        const nextLevel = gameNumber + 1;
+        const nextGameId = `${size}-${nextLevel}`;
+        this.generateGridFromGameId(nextGameId);
     }
 
     updateYamlExport() {
