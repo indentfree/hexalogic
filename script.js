@@ -1345,19 +1345,38 @@ class HexGridGame {
             if (this.mode === 'game' && expected !== undefined && expected !== '') {
                 const exp = parseInt(expected);
                 const act = parseInt(current || '0');
-                // Couleur du texte selon actualWhite/cellCount/expectedBlack
-                const actualWhite = parseInt(cell.dataset.actual_white || '0');
-                const cellCount = parseInt(cell.dataset.cell_count || '0');
-                const expectedBlack = parseInt(cell.dataset.expected_black || '0');
-                const targetWhite = cellCount - expectedBlack;
-                if (valueText) {
-                    if (actualWhite === targetWhite) {
-                        valueText.setAttribute('fill', '#27ae60'); // vert
-                    } else if (actualWhite > targetWhite) {
-                        valueText.setAttribute('fill', '#e74c3c'); // rouge
-                    } else {
-                        valueText.setAttribute('fill', '#222'); // noir
+                if (this.debugMode) {
+                    // Couleur du texte selon actualWhite/cellCount/expectedBlack
+                    const actualWhite = parseInt(cell.dataset.actual_white || '0');
+                    const cellCount = parseInt(cell.dataset.cell_count || '0');
+                    const expectedBlack = parseInt(cell.dataset.expected_black || '0');
+                    const targetWhite = cellCount - expectedBlack;
+                    if (valueText) {
+                        if (actualWhite === targetWhite) {
+                            valueText.setAttribute('fill', '#27ae60'); // vert
+                            cell.setAttribute('stroke', '#27ae60');
+                            cell.setAttribute('stroke-width', '3');
+                        } else if (actualWhite > targetWhite) {
+                            valueText.setAttribute('fill', '#e74c3c'); // rouge
+                            cell.setAttribute('stroke', '#e74c3c');
+                            cell.setAttribute('stroke-width', '3');
+                        } else {
+                            valueText.setAttribute('fill', '#222'); // noir
+                            cell.setAttribute('stroke', '#b2bec3');
+                            cell.setAttribute('stroke-width', '1');
+                        }
                     }
+                } else {
+                    // Logique d'origine : texte blanc si vert/rouge, noir sinon
+                    if (act < exp) {
+                        if (valueText) valueText.setAttribute('fill', '#222'); // texte noir
+                    } else if (act === exp) {
+                        if (valueText) valueText.setAttribute('fill', '#fff'); // texte blanc
+                    } else {
+                        if (valueText) valueText.setAttribute('fill', '#fff'); // texte blanc
+                    }
+                    cell.setAttribute('stroke', '#b2bec3');
+                    cell.setAttribute('stroke-width', '1');
                 }
                 if (act < exp) {
                     cell.setAttribute('fill', '#fff'); // blanc
@@ -1371,6 +1390,8 @@ class HexGridGame {
             } else {
                 cell.setAttribute('fill', '#ff0000');
                 if (valueText) valueText.setAttribute('fill', '#fff'); // texte blanc
+                cell.setAttribute('stroke', '#b2bec3');
+                cell.setAttribute('stroke-width', '1');
             }
         });
         if (this.mode === 'game') {
@@ -1842,7 +1863,7 @@ class HexGridGame {
     // Crée des zones de 2 à maxZoneSize cellules consécutives de même état
     createZonesForCurrentStates(gameCells, N) {
         //const maxZoneSize = Math.max(2, Math.floor(N / 2)+2);
-        const maxZoneSize = N;
+        const maxZoneSize = N+2;
         
         // Génère des zoneId : A, B, ..., Z, AA, AB, ...
         function* zoneIdGenerator() {
