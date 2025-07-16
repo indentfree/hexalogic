@@ -2578,7 +2578,7 @@ class HexGridGame {
             const cellCount = parseInt(constraint.dataset.cell_count || '0');
             if (
                 ((actualWhite === (cellCount - expectedBlack)) || (actualBlack === expectedBlack)) &&
-                (actualWhite + expectedBlack < cellCount)
+                ((actualWhite + actualBlack) < cellCount)
             ) {
                 nbHint++;
             }
@@ -2595,7 +2595,7 @@ class HexGridGame {
             const cellCount = parseInt(constraint.dataset.cell_count || '0');
             return (
                 ((actualWhite === (cellCount - expectedBlack)) || (actualBlack === expectedBlack)) &&
-                (actualWhite + expectedBlack < cellCount)
+                (actualWhite + actualBlack < cellCount)
             );
         });
         if (eligible.length === 0) {
