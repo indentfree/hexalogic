@@ -1325,9 +1325,11 @@ class HexGridGame {
                     valueText.textContent = constraint.dataset.expected_black;
                 } else {
                     valueText.textContent = constraint.dataset.actual_black || '0';
+                    valueText.setAttribute('fill', '#fff');
                 }
             }
         });
+        this.updateConstraintColors();
     }
 
     updateConstraintColors() {
@@ -1343,16 +1345,27 @@ class HexGridGame {
             if (this.mode === 'game' && expected !== undefined && expected !== '') {
                 const exp = parseInt(expected);
                 const act = parseInt(current || '0');
+                // Couleur du texte selon actualWhite/cellCount/expectedBlack
+                const actualWhite = parseInt(cell.dataset.actual_white || '0');
+                const cellCount = parseInt(cell.dataset.cell_count || '0');
+                const expectedBlack = parseInt(cell.dataset.expected_black || '0');
+                const targetWhite = cellCount - expectedBlack;
+                if (valueText) {
+                    if (actualWhite === targetWhite) {
+                        valueText.setAttribute('fill', '#27ae60'); // vert
+                    } else if (actualWhite > targetWhite) {
+                        valueText.setAttribute('fill', '#e74c3c'); // rouge
+                    } else {
+                        valueText.setAttribute('fill', '#222'); // noir
+                    }
+                }
                 if (act < exp) {
                     cell.setAttribute('fill', '#fff'); // blanc
-                    if (valueText) valueText.setAttribute('fill', '#222'); // texte noir
                     allOk = false;
                 } else if (act === exp) {
                     cell.setAttribute('fill', '#27ae60'); // vert
-                    if (valueText) valueText.setAttribute('fill', '#fff'); // texte blanc
                 } else {
                     cell.setAttribute('fill', '#e74c3c'); // rouge
-                    if (valueText) valueText.setAttribute('fill', '#fff'); // texte blanc
                     allOk = false;
                 }
             } else {
