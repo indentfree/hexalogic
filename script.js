@@ -236,9 +236,15 @@ class HexGridGame {
                     } else {
                         hex.setAttribute('cursor', 'pointer');
                         hex.dataset.hexNumber = hexNumber;
-                        hex.dataset.state = 0; // Toujours initialisé à GRIS
-                        const zoneColor = hex.dataset.zoneId ? this.getZoneColor(hex.dataset.zoneId) : '#b2bec3';
-                        hex.setAttribute('fill', zoneColor);
+                        if (this.mode === 'edit') {
+                            hex.dataset.state = 2; // BLANC
+                            hex.setAttribute('fill', '#fff');
+                            delete hex.dataset.zoneId;
+                        } else {
+                            hex.dataset.state = 0; // GRIS
+                            const zoneColor = hex.dataset.zoneId ? this.getZoneColor(hex.dataset.zoneId) : '#b2bec3';
+                            hex.setAttribute('fill', zoneColor);
+                        }
                         hex.setAttribute('stroke', 'none');
                         hex.setAttribute('stroke-width', '0');
                         hexNumber++;
@@ -484,69 +490,81 @@ class HexGridGame {
     // Méthode simplifiée pour ajouter les événements à une cellule
     addSimpleCellEvents(hex) {
         hex.addEventListener('click', () => {
-            // Synchronisation des zones :
-            const zoneId = hex.dataset.zoneId;
-            if (zoneId) {
-                // Récupérer toutes les cellules de la même zone
-                const allZoneCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"][data-zone-id="' + zoneId + '"]'));
-                // Déterminer le nouvel état (cycle comme la cellule cliquée)
+            if (this.mode === 'edit') {
+                // Alterner uniquement entre BLANC (2) et NOIR (1), sans zone
                 let state = parseInt(hex.dataset.state);
                 const prevState = state;
-                const newState = (state + 1) % 3;
-                
-                // Enregistrer un seul coup pour toute la zone
-                this.recordZoneMove(allZoneCells, prevState, newState);
-                let color;
-                if (newState === 0) {
-                    // Récupérer tous les voisins de la zone
-                    const neighborZoneIds = new Set();
+                state = (state === 2) ? 1 : 2;
+                hex.dataset.state = state;
+                if (state === 1) {
+                    hex.setAttribute('fill', '#222'); // noir
+                } else {
+                    hex.setAttribute('fill', '#fff'); // blanc
+                }
+                hex.setAttribute('stroke', 'none');
+                hex.setAttribute('stroke-width', '0');
+                this.recordMove(hex, prevState, state);
+                this.updateAllActualBlack && this.updateAllActualBlack();
+                this.updateConstraintColors && this.updateConstraintColors();
+                this.updateYamlExport && this.updateYamlExport();
+            } else {
+                // Comportement normal (zones, cycle 3 états)
+                const zoneId = hex.dataset.zoneId;
+                if (zoneId) {
+                    // ... gestion zone ...
+                    const allZoneCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"][data-zone-id="' + zoneId + '"]'));
+                    let state = parseInt(hex.dataset.state);
+                    const prevState = state;
+                    const newState = (state + 1) % 3;
+                    this.recordZoneMove(allZoneCells, prevState, newState);
+                    let color;
+                    if (newState === 0) {
+                        // ... couleur zone ...
+                        const neighborZoneIds = new Set();
+                        allZoneCells.forEach(cell => {
+                            const row = parseInt(cell.dataset.row);
+                            const col = parseInt(cell.dataset.col);
+                            const neighbors = this.getNeighborsByCoords(row, col)
+                                .map(([nrow, ncol]) => this.findCellByCoords(nrow, ncol))
+                                .filter(ncell => ncell && ncell.dataset.zoneId && ncell.dataset.zoneId !== zoneId);
+                            neighbors.forEach(ncell => neighborZoneIds.add(ncell.dataset.zoneId));
+                        });
+                        const neighborColors = Array.from(neighborZoneIds).map(zid => {
+                            if (zid.startsWith('ISO')) {
+                                return this.isolatedZoneColors && this.isolatedZoneColors[zid] ? this.isolatedZoneColors[zid] : '#b2bec3';
+                            } else {
+                                return this.getZoneColor(zid);
+                            }
+                        });
+                        color = this.generateDistinctColor(neighborColors);
+                    }
                     allZoneCells.forEach(cell => {
-                        const row = parseInt(cell.dataset.row);
-                        const col = parseInt(cell.dataset.col);
-                        const neighbors = this.getNeighborsByCoords(row, col)
-                            .map(([nrow, ncol]) => this.findCellByCoords(nrow, ncol))
-                            .filter(ncell => ncell && ncell.dataset.zoneId && ncell.dataset.zoneId !== zoneId);
-                        neighbors.forEach(ncell => neighborZoneIds.add(ncell.dataset.zoneId));
-                    });
-                    // Récupérer les couleurs des zones voisines
-                    const neighborColors = Array.from(neighborZoneIds).map(zid => {
-                        if (zid.startsWith('ISO')) {
-                            return this.isolatedZoneColors && this.isolatedZoneColors[zid] ? this.isolatedZoneColors[zid] : '#b2bec3';
+                        cell.dataset.state = newState;
+                        if (newState === 0) {
+                            cell.setAttribute('fill', color);
+                            cell.setAttribute('stroke', 'none');
+                            cell.setAttribute('stroke-width', '0');
+                        } else if (newState === 1) {
+                            cell.setAttribute('fill', '#222'); // noir
+                            cell.setAttribute('stroke', 'none');
+                            cell.setAttribute('stroke-width', '0');
                         } else {
-                            return this.getZoneColor(zid);
+                            cell.setAttribute('fill', '#fff'); // blanc
+                            cell.setAttribute('stroke', 'none');
+                            cell.setAttribute('stroke-width', '0');
                         }
                     });
-                    color = this.generateDistinctColor(neighborColors);
-                }
-                allZoneCells.forEach(cell => {
-                    cell.dataset.state = newState;
-                    if (newState === 0) {
-                        cell.setAttribute('fill', color);
-                        cell.setAttribute('stroke', 'none');
-                        cell.setAttribute('stroke-width', '0');
-                    } else if (newState === 1) {
-                        cell.setAttribute('fill', '#222'); // noir
-                        cell.setAttribute('stroke', 'none');
-                        cell.setAttribute('stroke-width', '0');
-                    } else {
-                        cell.setAttribute('fill', '#fff'); // blanc
-                        cell.setAttribute('stroke', 'none');
-                        cell.setAttribute('stroke-width', '0');
+                    this.updateAllActualBlack();
+                    this.updateConstraintColors();
+                    if (this.mode === 'edit') {
+                        this.updateYamlExport();
                     }
-                });
-                            // Mettre à jour les contraintes une seule fois
-            this.updateAllActualBlack();
-            this.updateConstraintColors();
-            if (this.mode === 'edit') {
-                this.updateYamlExport();
-            }
-            
-            // Vérifier la progression si on est en mode jeu
-            if (this.mode === 'game') {
-                this.checkAndSaveProgress();
-            }
-            } else {
-                this.cycleHexState(hex);
+                    if (this.mode === 'game') {
+                        this.checkAndSaveProgress();
+                    }
+                } else {
+                    this.cycleHexState(hex);
+                }
             }
         });
         hex.addEventListener('mouseenter', (e) => {
@@ -1161,9 +1179,15 @@ class HexGridGame {
                 } else {
                     hex.setAttribute('cursor', 'pointer');
                     hex.dataset.hexNumber = hexNumber;
-                    hex.dataset.state = 0; // Toujours initialisé à GRIS
-                    const zoneColor = hex.dataset.zoneId ? this.getZoneColor(hex.dataset.zoneId) : '#b2bec3';
-                    hex.setAttribute('fill', zoneColor);
+                    if (this.mode === 'edit') {
+                        hex.dataset.state = 2; // BLANC
+                        hex.setAttribute('fill', '#fff');
+                        delete hex.dataset.zoneId;
+                    } else {
+                        hex.dataset.state = 0; // GRIS
+                        const zoneColor = hex.dataset.zoneId ? this.getZoneColor(hex.dataset.zoneId) : '#b2bec3';
+                        hex.setAttribute('fill', zoneColor);
+                    }
                     hex.setAttribute('stroke', 'none');
                     hex.setAttribute('stroke-width', '0');
                     hexNumber++;
@@ -2150,6 +2174,9 @@ class HexGridGame {
         this.setYamlExportVisibility();
         this.setControlsVisibility();
         this.closeMenu();
+        if (this.mode === 'edit') {
+            this.generateGrid();
+        }
     }
 
     // Bascule l'animation
