@@ -37,6 +37,11 @@ class HexGridGame {
         // Par exemple, dans le constructeur :
         // const msgDiv = document.getElementById('victoryMsg');
         // if (msgDiv) msgDiv.style.display = 'none';
+        this.debugMode = false;
+        // Activer debug via l'URL
+        if (window.location.search.includes('debug=true')) {
+            this.debugMode = true;
+        }
     }
     
     initializeElements() {
@@ -465,10 +470,18 @@ class HexGridGame {
                         valueText.textContent = hex.dataset.actual_black || hex.dataset.currentValue || '0';
                     }
                     this.hexGridSvg.appendChild(valueText);
+                    // Double-clic debug
+                    hex.addEventListener('dblclick', (e) => {
+                        if (this.debugMode) {
+                            e.stopPropagation();
+                            this.showConstraintDebugPopup(hex);
+                        }
+                    });
                 }
                 // Ajout : en mode GAME, clic sur contrainte = highlight
                 if (this.mode === 'game' && hex.dataset.type === 'constraint') {
-                    hex.addEventListener('click', () => {
+                    hex.addEventListener('click', (e) => {
+                        e.stopPropagation();
                         if (hex.dataset.constraintId) {
                             const type = hex.dataset.constraintId[0];
                             const val = parseInt(hex.dataset.constraintId.slice(1));
@@ -481,7 +494,7 @@ class HexGridGame {
                 });
                 hex.addEventListener('mouseleave', () => {
                     this.hideTooltip();
-                    this.clearNeighborHighlight();
+                    // Ne pas clear la highlight sur mouseleave, pour la rendre persistante après clic
                 });
             }
         });
@@ -1266,20 +1279,35 @@ class HexGridGame {
         const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
         constraintCells.forEach(constraint => {
             const type = constraint.dataset.constraintId ? constraint.dataset.constraintId[0] : null;
-            let val = 0;
+            let valBlack = 0;
+            let valWhite = 0;
+            let cellCount = 0;
             if (type) {
                 const i = parseInt(constraint.dataset.i);
                 const j = parseInt(constraint.dataset.j);
                 const k = parseInt(constraint.dataset.k);
                 gameCells.forEach(cell => {
-                    if (parseInt(cell.dataset.state) === 1) {
-                        if (type === 'I' && parseInt(cell.dataset.i) === i) val++;
-                        if (type === 'J' && parseInt(cell.dataset.j) === j) val++;
-                        if (type === 'K' && parseInt(cell.dataset.k) === k) val++;
+                    const state = parseInt(cell.dataset.state);
+                    if (type === 'I' && parseInt(cell.dataset.i) === i) {
+                        cellCount++;
+                        if (state === 1) valBlack++;
+                        if (state === 2) valWhite++;
+                    }
+                    if (type === 'J' && parseInt(cell.dataset.j) === j) {
+                        cellCount++;
+                        if (state === 1) valBlack++;
+                        if (state === 2) valWhite++;
+                    }
+                    if (type === 'K' && parseInt(cell.dataset.k) === k) {
+                        cellCount++;
+                        if (state === 1) valBlack++;
+                        if (state === 2) valWhite++;
                     }
                 });
             }
-            constraint.dataset.actual_black = val;
+            constraint.dataset.actual_black = valBlack;
+            constraint.dataset.actual_white = valWhite;
+            constraint.dataset.cell_count = cellCount;
         });
         // Mettre à jour l'affichage SVG
         this.updateConstraintTexts();
@@ -2235,6 +2263,27 @@ class HexGridGame {
                 }
             });
         });
+        // Ajouter le bouton DEBUG si pas déjà présent
+        let debugBtn = document.getElementById('debugModeBtn');
+        if (!debugBtn) {
+            debugBtn = document.createElement('button');
+            debugBtn.id = 'debugModeBtn';
+            debugBtn.className = 'menu-btn';
+            debugBtn.textContent = this.debugMode ? 'Mode DEBUG : ON' : 'Mode DEBUG : OFF';
+            debugBtn.style.background = this.debugMode ? '#27ae60' : '';
+            debugBtn.onclick = () => {
+                this.debugMode = !this.debugMode;
+                debugBtn.textContent = this.debugMode ? 'Mode DEBUG : ON' : 'Mode DEBUG : OFF';
+                debugBtn.style.background = this.debugMode ? '#27ae60' : '';
+            };
+            // Ajouter dans la dernière section du menu hamburger
+            const menuSections = document.querySelectorAll('.menu-section');
+            if (menuSections.length > 0) {
+                menuSections[menuSections.length - 1].appendChild(debugBtn);
+            } else {
+                menuOverlay.appendChild(debugBtn);
+            }
+        }
     }
 
     // Génère une grille de taille spécifique
@@ -2388,6 +2437,77 @@ class HexGridGame {
                 this.showVictoryMessage(false);
             }
         }
+    }
+
+    showConstraintDebugPopup(constraint) {
+        let popup = document.getElementById('debugConstraintPopup');
+        if (!popup) {
+            popup = document.createElement('div');
+            popup.id = 'debugConstraintPopup';
+            popup.style.position = 'fixed';
+            popup.style.top = '50%';
+            popup.style.left = '50%';
+            popup.style.transform = 'translate(-50%, -50%)';
+            popup.style.background = 'rgba(44,62,80,0.92)';
+            popup.style.color = 'white';
+            popup.style.padding = '24px 32px';
+            popup.style.fontSize = '1em';
+            popup.style.borderRadius = '12px';
+            popup.style.zIndex = 3000;
+            popup.style.boxShadow = '0 8px 32px rgba(0,0,0,0.25)';
+            popup.style.textAlign = 'center';
+            popup.style.minWidth = '260px';
+            popup.style.maxWidth = '90vw';
+            popup.style.maxHeight = '80vh';
+            popup.style.overflow = 'auto';
+            // Bouton X pour fermer
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '✕';
+            closeBtn.style.position = 'absolute';
+            closeBtn.style.top = '8px';
+            closeBtn.style.right = '16px';
+            closeBtn.style.background = 'transparent';
+            closeBtn.style.color = 'white';
+            closeBtn.style.fontSize = '1.2em';
+            closeBtn.style.border = 'none';
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.style.zIndex = 3100;
+            closeBtn.onclick = () => { popup.style.display = 'none'; };
+            popup.appendChild(closeBtn);
+            document.body.appendChild(popup);
+        }
+        // Remplir le contenu
+        popup.innerHTML = '';
+        // Bouton X
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '✕';
+        closeBtn.style.position = 'absolute';
+        closeBtn.style.top = '8px';
+        closeBtn.style.right = '16px';
+        closeBtn.style.background = 'transparent';
+        closeBtn.style.color = 'white';
+        closeBtn.style.fontSize = '1.2em';
+        closeBtn.style.border = 'none';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.zIndex = 3100;
+        closeBtn.onclick = () => { popup.style.display = 'none'; };
+        popup.appendChild(closeBtn);
+        // Titre
+        const title = document.createElement('div');
+        title.textContent = 'DEBUG CONTRAINTE';
+        title.style.fontWeight = 'bold';
+        title.style.fontSize = '1.1em';
+        title.style.marginBottom = '18px';
+        popup.appendChild(title);
+        // Infos
+        const infos = document.createElement('div');
+        infos.innerHTML = `
+            <div><b>actualBlack</b> : ${constraint.dataset.actual_black}</div>
+            <div><b>actualWhite</b> : ${constraint.dataset.actual_white}</div>
+            <div><b>cellCount</b> : ${constraint.dataset.cell_count}</div>
+        `;
+        popup.appendChild(infos);
+        popup.style.display = '';
     }
 }
 
