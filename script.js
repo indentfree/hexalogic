@@ -2752,7 +2752,7 @@ class HexGridGame {
                     const t = chosen.dataset.constraintId[0];
                     const v = parseInt(chosen.dataset.constraintId.slice(1));
                     this.highlightGameCellsByConstraint(t, v);
-                    this.showHintPopup && this.showHintPopup("Indice facile : une ligne est proche d'être complétée.");
+                    this.showHintPopup && this.showHintPopup("Indice facile : cette ligne peut être complétée.");
                     return;
                 }
             }
@@ -2764,7 +2764,7 @@ class HexGridGame {
                     const t = chosen.constraint.dataset.constraintId[0];
                     const v = parseInt(chosen.constraint.dataset.constraintId.slice(1));
                     this.highlightGameCellsByConstraint(t, v);
-                    let msg = `Indice moyen : la zone ${chosen.zs.zoneId} doit être ` + (chosen.type === 'white' ? 'BLANCHE' : 'NOIRE') + ".";
+                    let msg = `Indice moyen : la zone la plus grande doit être ` + (chosen.type === 'white' ? 'BLANCHE' : 'NOIRE') + ".";
                     this.showHintPopup && this.showHintPopup(msg);
                     return;
                 }
