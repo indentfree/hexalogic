@@ -1282,32 +1282,57 @@ class HexGridGame {
             let valBlack = 0;
             let valWhite = 0;
             let cellCount = 0;
+            // Pour zoneStates
+            const zoneMap = new Map();
             if (type) {
                 const i = parseInt(constraint.dataset.i);
                 const j = parseInt(constraint.dataset.j);
                 const k = parseInt(constraint.dataset.k);
                 gameCells.forEach(cell => {
                     const state = parseInt(cell.dataset.state);
+                    const zoneId = cell.dataset.zoneId || null;
                     if (type === 'I' && parseInt(cell.dataset.i) === i) {
                         cellCount++;
                         if (state === 1) valBlack++;
                         if (state === 2) valWhite++;
+                        if (zoneId) {
+                            if (!zoneMap.has(zoneId)) zoneMap.set(zoneId, []);
+                            zoneMap.get(zoneId).push(state);
+                        }
                     }
                     if (type === 'J' && parseInt(cell.dataset.j) === j) {
                         cellCount++;
                         if (state === 1) valBlack++;
                         if (state === 2) valWhite++;
+                        if (zoneId) {
+                            if (!zoneMap.has(zoneId)) zoneMap.set(zoneId, []);
+                            zoneMap.get(zoneId).push(state);
+                        }
                     }
                     if (type === 'K' && parseInt(cell.dataset.k) === k) {
                         cellCount++;
                         if (state === 1) valBlack++;
                         if (state === 2) valWhite++;
+                        if (zoneId) {
+                            if (!zoneMap.has(zoneId)) zoneMap.set(zoneId, []);
+                            zoneMap.get(zoneId).push(state);
+                        }
                     }
                 });
             }
             constraint.dataset.actual_black = valBlack;
             constraint.dataset.actual_white = valWhite;
             constraint.dataset.cell_count = cellCount;
+            // Calculer zoneStates
+            const zoneStates = [];
+            for (const [zoneId, states] of zoneMap.entries()) {
+                let state = states[0];
+                for (let s of states) {
+                    if (s !== state) { state = 0; break; }
+                }
+                zoneStates.push({ zoneId, count: states.length, state });
+            }
+            constraint.zoneStates = zoneStates;
         });
         // Mettre à jour l'affichage SVG
         this.updateConstraintTexts();
@@ -2563,6 +2588,24 @@ class HexGridGame {
             <div><b>cellCount</b> : ${constraint.dataset.cell_count}</div>
         `;
         popup.appendChild(infos);
+        // Affichage zoneStates
+        if (constraint.zoneStates && constraint.zoneStates.length > 0) {
+            const zoneDiv = document.createElement('div');
+            zoneDiv.style.marginTop = '18px';
+            zoneDiv.innerHTML = '<b>Zones sur la contrainte :</b>';
+            const table = document.createElement('table');
+            table.style.margin = '8px auto';
+            table.style.borderCollapse = 'collapse';
+            table.innerHTML = '<tr><th style="padding:2px 8px;">Zone</th><th style="padding:2px 8px;">Count</th><th style="padding:2px 8px;">État</th></tr>';
+            for (const zs of constraint.zoneStates) {
+                let stateTxt = zs.state === 1 ? 'NOIR' : zs.state === 2 ? 'BLANC' : '?';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td style="padding:2px 8px;">${zs.zoneId}</td><td style="padding:2px 8px;">${zs.count}</td><td style="padding:2px 8px;">${stateTxt}</td>`;
+                table.appendChild(tr);
+            }
+            zoneDiv.appendChild(table);
+            popup.appendChild(zoneDiv);
+        }
         popup.style.display = '';
     }
 
