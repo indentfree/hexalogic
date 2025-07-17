@@ -1902,6 +1902,7 @@ class HexGridGame {
             
             // S'assurer que les contrôles de jeu sont bien positionnés
             this.repositionGameControls();
+            this.updateAllActualBlack();
         });
     }
 
