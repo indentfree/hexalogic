@@ -235,7 +235,8 @@ class HexGridGame {
                         hex.setAttribute('stroke-width', '1');
                         hex.setAttribute('pointer-events', 'none');
                     } else if (isBorderCell) {
-                        hex.setAttribute('fill', '#ff0000');
+                        hex.dataset.state = 0; // GRIS
+                        hex.setAttribute('fill', '#b2bec3');
                         hex.setAttribute('stroke', '#b2bec3');
                         hex.setAttribute('stroke-width', '1');
                     } else {
@@ -1116,6 +1117,8 @@ class HexGridGame {
                     cell.setAttribute('stroke', 'none');
                     cell.setAttribute('stroke-width', '0');
                 });
+                // Calculer les contraintes une première fois après réinitialisation
+                this.updateAllActualBlack();
                 // Réappliquer les contraintes depuis la config après la génération et la réinitialisation
                 if (conf.constraints) {
                     this.initConstraintsFromConf(conf.constraints);
@@ -1186,7 +1189,8 @@ class HexGridGame {
                     hex.setAttribute('stroke-width', '1');
                     hex.setAttribute('pointer-events', 'none');
                 } else if (isBorderCell) {
-                    hex.setAttribute('fill', '#ff0000');
+                    hex.dataset.state = 0; // GRIS
+                    hex.setAttribute('fill', '#b2bec3');
                     hex.setAttribute('stroke', '#b2bec3');
                     hex.setAttribute('stroke-width', '1');
                 } else {
@@ -1220,6 +1224,14 @@ class HexGridGame {
                 } else {
                     delete gameCells[i].dataset.zoneId;
                 }
+            }
+        }
+        // Forcer toutes les cellules de jeu à GRIS au démarrage (sauf en mode EDIT)
+        if (this.mode !== 'edit') {
+            const gameCells = hexCells.filter(hex => hex.dataset.type === 'game');
+            for (const cell of gameCells) {
+                cell.dataset.state = 0;
+                cell.setAttribute('fill', '#b2bec3');
             }
         }
         
@@ -1326,10 +1338,17 @@ class HexGridGame {
             // Calculer zoneStates
             const zoneStates = [];
             for (const [zoneId, states] of zoneMap.entries()) {
-                let state = states[0];
+                // Si toutes les cellules sont GRIS (0), state=0
+                let allSame = true;
+                let first = states[0];
                 for (let s of states) {
-                    if (s !== state) { state = 0; break; }
+                    if (s !== first) { allSame = false; break; }
                 }
+                let state = 0;
+                if (allSame) {
+                    state = first; // 0=GRIS, 1=NOIR, 2=BLANC
+                } // sinon state=0 (mixte ou indéfini)
+                // Si toutes GRIS, state=0
                 zoneStates.push({ zoneId, count: states.length, state });
             }
             constraint.zoneStates = zoneStates;
@@ -2364,6 +2383,55 @@ class HexGridGame {
                 menuOverlay.appendChild(hintBtn);
             }
         }
+        // Boutons HINT séparés
+        let hintEasyBtn = document.getElementById('hintEasyBtn');
+        if (!hintEasyBtn) {
+            hintEasyBtn = document.createElement('button');
+            hintEasyBtn.id = 'hintEasyBtn';
+            hintEasyBtn.className = 'menu-btn';
+            hintEasyBtn.style.background = '#f8f9fa';
+            hintEasyBtn.style.color = '#333';
+            hintEasyBtn.style.fontWeight = 'bold';
+            hintEasyBtn.onclick = () => { this.showHintType('easy'); };
+            const menuSections = document.querySelectorAll('.menu-section');
+            if (menuSections.length > 0) {
+                menuSections[menuSections.length - 1].appendChild(hintEasyBtn);
+            } else {
+                menuOverlay.appendChild(hintEasyBtn);
+            }
+        }
+        let hintMediumBtn = document.getElementById('hintMediumBtn');
+        if (!hintMediumBtn) {
+            hintMediumBtn = document.createElement('button');
+            hintMediumBtn.id = 'hintMediumBtn';
+            hintMediumBtn.className = 'menu-btn';
+            hintMediumBtn.style.background = '#f8f9fa';
+            hintMediumBtn.style.color = '#333';
+            hintMediumBtn.style.fontWeight = 'bold';
+            hintMediumBtn.onclick = () => { this.showHintType('medium'); };
+            const menuSections = document.querySelectorAll('.menu-section');
+            if (menuSections.length > 0) {
+                menuSections[menuSections.length - 1].appendChild(hintMediumBtn);
+            } else {
+                menuOverlay.appendChild(hintMediumBtn);
+            }
+        }
+        let hintHardBtn = document.getElementById('hintHardBtn');
+        if (!hintHardBtn) {
+            hintHardBtn = document.createElement('button');
+            hintHardBtn.id = 'hintHardBtn';
+            hintHardBtn.className = 'menu-btn';
+            hintHardBtn.style.background = '#f8f9fa';
+            hintHardBtn.style.color = '#333';
+            hintHardBtn.style.fontWeight = 'bold';
+            hintHardBtn.onclick = () => { this.showHintType('hard'); };
+            const menuSections = document.querySelectorAll('.menu-section');
+            if (menuSections.length > 0) {
+                menuSections[menuSections.length - 1].appendChild(hintHardBtn);
+            } else {
+                menuOverlay.appendChild(hintHardBtn);
+            }
+        }
         this.updateHintBtn && this.updateHintBtn();
     }
 
@@ -2586,6 +2654,9 @@ class HexGridGame {
             <div><b>actualBlack</b> : ${constraint.dataset.actual_black}</div>
             <div><b>actualWhite</b> : ${constraint.dataset.actual_white}</div>
             <div><b>cellCount</b> : ${constraint.dataset.cell_count}</div>
+            <div><b>hintEasy</b> : ${this.hintEasyList && this.hintEasyList.includes(constraint) ? 'true' : 'false'}</div>
+            <div><b>hintMedium</b> : ${this.hintMediumList && this.hintMediumList.some(h => h.constraint === constraint) ? 'true' : 'false'}</div>
+            <div><b>hintHard</b> : false</div>
         `;
         popup.appendChild(infos);
         // Affichage zoneStates
@@ -2613,45 +2684,130 @@ class HexGridGame {
         const hintBtn = document.getElementById('hintBtn');
         if (!hintBtn) return;
         const constraints = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
-        let nbHint = 0;
+        let nbHintEasy = 0, nbHintMedium = 0, nbHintHard = 0;
+        this.hintEasyList = [];
+        this.hintMediumList = [];
+        this.hintHardList = [];
         constraints.forEach(constraint => {
             const actualWhite = parseInt(constraint.dataset.actual_white || '0');
             const actualBlack = parseInt(constraint.dataset.actual_black || '0');
             const expectedBlack = parseInt(constraint.dataset.expected_black || '0');
             const cellCount = parseInt(constraint.dataset.cell_count || '0');
+            // HintEasy
             if (
                 ((actualWhite === (cellCount - expectedBlack)) || (actualBlack === expectedBlack)) &&
-                ((actualWhite + actualBlack) < cellCount)
+                (actualWhite + actualBlack < cellCount)
             ) {
-                nbHint++;
+                nbHintEasy++;
+                this.hintEasyList.push(constraint);
             }
+            // HintMedium
+            if (constraint.zoneStates && constraint.zoneStates.length > 0) {
+                // Chercher la zone la plus grande (et unique)
+                let maxCount = 0, maxZones = [];
+                for (const zs of constraint.zoneStates) {
+                    if (zs.state === 0) {
+                        if (zs.count > maxCount) {
+                            maxCount = zs.count;
+                            maxZones = [zs];
+                        } else if (zs.count === maxCount) {
+                            maxZones.push(zs);
+                        }
+                    }
+                }
+                if (maxZones.length === 1) {
+                    const zs = maxZones[0];
+                    // Règle 1 : zone doit être blanche
+                    if (zs.count + actualBlack > expectedBlack) {
+                        nbHintMedium++;
+                        this.hintMediumList.push({constraint, zs, type: 'white'});
+                    }
+                    // Règle 2 : zone doit être noire
+                    if (zs.count + actualWhite > (cellCount - expectedBlack)) {
+                        nbHintMedium++;
+                        this.hintMediumList.push({constraint, zs, type: 'black'});
+                    }
+                }
+            }
+            // HintHard : à implémenter plus tard
         });
-        hintBtn.textContent = `HINT (${nbHint})`;
+        // ...
+        const hintEasyBtn = document.getElementById('hintEasyBtn');
+        if (hintEasyBtn) hintEasyBtn.textContent = `HINT EASY (${nbHintEasy})`;
+        const hintMediumBtn = document.getElementById('hintMediumBtn');
+        if (hintMediumBtn) hintMediumBtn.textContent = `HINT MEDIUM (${nbHintMedium})`;
+        const hintHardBtn = document.getElementById('hintHardBtn');
+        if (hintHardBtn) hintHardBtn.textContent = `HINT HARD (${nbHintHard})`;
+        this.nbHintEasy = nbHintEasy;
+        this.nbHintMedium = nbHintMedium;
+        this.nbHintHard = nbHintHard;
+    }
+
+    showHintType(type) {
+        if (type === 'easy') {
+            if (this.hintEasyList && this.hintEasyList.length > 0) {
+                const chosen = this.hintEasyList[Math.floor(Math.random() * this.hintEasyList.length)];
+                if (chosen && chosen.dataset.constraintId) {
+                    const t = chosen.dataset.constraintId[0];
+                    const v = parseInt(chosen.dataset.constraintId.slice(1));
+                    this.highlightGameCellsByConstraint(t, v);
+                    this.showHintPopup && this.showHintPopup("Indice facile : une ligne est proche d'être complétée.");
+                    return;
+                }
+            }
+            this.showHintPopup && this.showHintPopup("Aucun indice facile disponible");
+        } else if (type === 'medium') {
+            if (this.hintMediumList && this.hintMediumList.length > 0) {
+                const chosen = this.hintMediumList[Math.floor(Math.random() * this.hintMediumList.length)];
+                if (chosen && chosen.constraint && chosen.constraint.dataset.constraintId) {
+                    const t = chosen.constraint.dataset.constraintId[0];
+                    const v = parseInt(chosen.constraint.dataset.constraintId.slice(1));
+                    this.highlightGameCellsByConstraint(t, v);
+                    let msg = `Indice moyen : la zone ${chosen.zs.zoneId} doit être ` + (chosen.type === 'white' ? 'BLANCHE' : 'NOIRE') + ".";
+                    this.showHintPopup && this.showHintPopup(msg);
+                    return;
+                }
+            }
+            this.showHintPopup && this.showHintPopup("Aucun indice moyen disponible");
+        } else if (type === 'hard') {
+            if (this.hintHardList && this.hintHardList.length > 0) {
+                // Placeholder pour HintHard
+                this.showHintPopup && this.showHintPopup("Indice difficile : à venir.");
+                return;
+            }
+            this.showHintPopup && this.showHintPopup("Aucun indice difficile disponible");
+        }
     }
 
     showHint() {
-        const constraints = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
-        const eligible = constraints.filter(constraint => {
-            const actualWhite = parseInt(constraint.dataset.actual_white || '0');
-            const actualBlack = parseInt(constraint.dataset.actual_black || '0');
-            const expectedBlack = parseInt(constraint.dataset.expected_black || '0');
-            const cellCount = parseInt(constraint.dataset.cell_count || '0');
-            return (
-                ((actualWhite === (cellCount - expectedBlack)) || (actualBlack === expectedBlack)) &&
-                (actualWhite + actualBlack < cellCount)
-            );
-        });
-        if (eligible.length === 0) {
-            this.showHintPopup && this.showHintPopup("Aucun indice disponible");
+        // Priorité : Easy > Medium > Hard
+        if (this.hintEasyList && this.hintEasyList.length > 0) {
+            const chosen = this.hintEasyList[Math.floor(Math.random() * this.hintEasyList.length)];
+            if (chosen && chosen.dataset.constraintId) {
+                const type = chosen.dataset.constraintId[0];
+                const val = parseInt(chosen.dataset.constraintId.slice(1));
+                this.highlightGameCellsByConstraint(type, val);
+                this.showHintPopup && this.showHintPopup("Indice facile : une ligne est proche d'être complétée.");
+                return;
+            }
+        }
+        if (this.hintMediumList && this.hintMediumList.length > 0) {
+            const chosen = this.hintMediumList[Math.floor(Math.random() * this.hintMediumList.length)];
+            if (chosen && chosen.constraint && chosen.constraint.dataset.constraintId) {
+                const type = chosen.constraint.dataset.constraintId[0];
+                const val = parseInt(chosen.constraint.dataset.constraintId.slice(1));
+                this.highlightGameCellsByConstraint(type, val);
+                let msg = `Indice moyen : la zone ${chosen.zs.zoneId} doit être ` + (chosen.type === 'white' ? 'BLANCHE' : 'NOIRE') + ".";
+                this.showHintPopup && this.showHintPopup(msg);
+                return;
+            }
+        }
+        if (this.hintHardList && this.hintHardList.length > 0) {
+            // Placeholder pour HintHard
+            this.showHintPopup && this.showHintPopup("Indice difficile : à venir.");
             return;
         }
-        // Choisir une contrainte au hasard
-        const chosen = eligible[Math.floor(Math.random() * eligible.length)];
-        if (chosen && chosen.dataset.constraintId) {
-            const type = chosen.dataset.constraintId[0];
-            const val = parseInt(chosen.dataset.constraintId.slice(1));
-            this.highlightGameCellsByConstraint(type, val);
-        }
+        this.showHintPopup && this.showHintPopup("Aucun indice disponible");
     }
 
     showHintPopup(msg) {
