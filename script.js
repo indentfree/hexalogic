@@ -2657,7 +2657,7 @@ class HexGridGame {
             <div><b>cellCount</b> : ${constraint.dataset.cell_count}</div>
             <div><b>hintEasy</b> : ${this.hintEasyList && this.hintEasyList.includes(constraint) ? 'true' : 'false'}</div>
             <div><b>hintMedium</b> : ${this.hintMediumList && this.hintMediumList.some(h => h.constraint === constraint) ? 'true' : 'false'}</div>
-            <div><b>hintHard</b> : false</div>
+            <div><b>hintHard</b> : ${this.hintHardList && this.hintHardList.some(h => h.constraint === constraint) ? 'true' : 'false'}</div>
         `;
         popup.appendChild(infos);
         // Affichage zoneStates
@@ -2701,6 +2701,7 @@ class HexGridGame {
             ) {
                 nbHintEasy++;
                 this.hintEasyList.push(constraint);
+                return; // Ne pas évaluer Medium/Hard si Easy trouvé
             }
             // HintMedium
             if (constraint.zoneStates && constraint.zoneStates.length > 0) {
@@ -2722,15 +2723,35 @@ class HexGridGame {
                     if (zs.count + actualBlack > expectedBlack) {
                         nbHintMedium++;
                         this.hintMediumList.push({constraint, zs, type: 'white'});
+                        return; // Ne pas évaluer Hard si Medium trouvé
                     }
                     // Règle 2 : zone doit être noire
                     if (zs.count + actualWhite > (cellCount - expectedBlack)) {
                         nbHintMedium++;
                         this.hintMediumList.push({constraint, zs, type: 'black'});
+                        return; // Ne pas évaluer Hard si Medium trouvé
                     }
                 }
             }
-            // HintHard : à implémenter plus tard
+            // HintHard : règle de parité sur zone grise impaire unique
+            if (constraint.zoneStates && constraint.zoneStates.length > 0) {
+                // Lister les zones grises (state=0) de taille impaire
+                const grayOddZones = constraint.zoneStates.filter(zs => zs.state === 0 && zs.count % 2 === 1);
+                if (grayOddZones.length === 1) {
+                    const zs = grayOddZones[0];
+                    // Parité expectedBlack/actualBlack
+                    if ((expectedBlack % 2 !== actualBlack % 2)) {
+                        nbHintHard++;
+                        this.hintHardList.push({constraint, zs, type: 'black', reason: 'parity-black'});
+                    }
+                    // Parité expectedWhite/actualWhite
+                    const expectedWhite = cellCount - expectedBlack;
+                    if ((expectedWhite % 2 !== actualWhite % 2)) {
+                        nbHintHard++;
+                        this.hintHardList.push({constraint, zs, type: 'white', reason: 'parity-white'});
+                    }
+                }
+            }
         });
         // ...
         const hintEasyBtn = document.getElementById('hintEasyBtn');
@@ -2772,9 +2793,23 @@ class HexGridGame {
             this.showHintPopup && this.showHintPopup("Aucun indice moyen disponible");
         } else if (type === 'hard') {
             if (this.hintHardList && this.hintHardList.length > 0) {
-                // Placeholder pour HintHard
-                this.showHintPopup && this.showHintPopup("Indice difficile : à venir.");
-                return;
+                const chosen = this.hintHardList[Math.floor(Math.random() * this.hintHardList.length)];
+                if (chosen && chosen.constraint && chosen.constraint.dataset.constraintId) {
+                    const t = chosen.constraint.dataset.constraintId[0];
+                    const v = parseInt(chosen.constraint.dataset.constraintId.slice(1));
+                    // Surligner la zone concernée
+                    const zoneId = chosen.zs.zoneId;
+                    const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"][data-zone-id="' + zoneId + '"]'));
+                    gameCells.forEach(cell => {
+                        cell.setAttribute('stroke', '#fdcb6e');
+                        cell.setAttribute('stroke-width', '4');
+                    });
+                    // Surligner aussi la contrainte
+                    this.highlightGameCellsByConstraint(t, v);
+                    let msg = `Indice difficile : la zone ${zoneId} (taille impaire) doit être ` + (chosen.type === 'white' ? 'BLANCHE' : 'NOIRE') + ' à cause de la parité.';
+                    this.showHintPopup && this.showHintPopup(msg);
+                    return;
+                }
             }
             this.showHintPopup && this.showHintPopup("Aucun indice difficile disponible");
         }
@@ -2804,9 +2839,23 @@ class HexGridGame {
             }
         }
         if (this.hintHardList && this.hintHardList.length > 0) {
-            // Placeholder pour HintHard
-            this.showHintPopup && this.showHintPopup("Indice difficile : à venir.");
-            return;
+            const chosen = this.hintHardList[Math.floor(Math.random() * this.hintHardList.length)];
+            if (chosen && chosen.constraint && chosen.constraint.dataset.constraintId) {
+                const t = chosen.constraint.dataset.constraintId[0];
+                const v = parseInt(chosen.constraint.dataset.constraintId.slice(1));
+                // Surligner la zone concernée
+                const zoneId = chosen.zs.zoneId;
+                const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"][data-zone-id="' + zoneId + '"]'));
+                gameCells.forEach(cell => {
+                    cell.setAttribute('stroke', '#fdcb6e');
+                    cell.setAttribute('stroke-width', '4');
+                });
+                // Surligner aussi la contrainte
+                this.highlightGameCellsByConstraint(t, v);
+                let msg = `Indice difficile : la zone ${zoneId} (taille impaire) doit être ` + (chosen.type === 'white' ? 'BLANCHE' : 'NOIRE') + ' à cause de la parité.';
+                this.showHintPopup && this.showHintPopup(msg);
+                return;
+            }
         }
         this.showHintPopup && this.showHintPopup("Aucun indice disponible");
     }
