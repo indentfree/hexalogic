@@ -2784,6 +2784,8 @@ class HexGridGame {
                 if (chosen && chosen.constraint && chosen.constraint.dataset.constraintId) {
                     const t = chosen.constraint.dataset.constraintId[0];
                     const v = parseInt(chosen.constraint.dataset.constraintId.slice(1));
+                    // Ne PAS surligner la zone concernée
+                    // Surligner seulement la contrainte
                     this.highlightGameCellsByConstraint(t, v);
                     let msg = `Indice moyen : la zone la plus grande doit être ` + (chosen.type === 'white' ? 'BLANCHE' : 'NOIRE') + ".";
                     this.showHintPopup && this.showHintPopup(msg);
@@ -2797,16 +2799,10 @@ class HexGridGame {
                 if (chosen && chosen.constraint && chosen.constraint.dataset.constraintId) {
                     const t = chosen.constraint.dataset.constraintId[0];
                     const v = parseInt(chosen.constraint.dataset.constraintId.slice(1));
-                    // Surligner la zone concernée
-                    const zoneId = chosen.zs.zoneId;
-                    const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"][data-zone-id="' + zoneId + '"]'));
-                    gameCells.forEach(cell => {
-                        cell.setAttribute('stroke', '#fdcb6e');
-                        cell.setAttribute('stroke-width', '4');
-                    });
-                    // Surligner aussi la contrainte
+                    // Ne PAS surligner la zone concernée
+                    // Surligner seulement la contrainte
                     this.highlightGameCellsByConstraint(t, v);
-                    let msg = `Indice difficile : la zone ${zoneId} (taille impaire) doit être ` + (chosen.type === 'white' ? 'BLANCHE' : 'NOIRE') + ' à cause de la parité.';
+                    let msg = `Indice difficile : la zone de taille impaire doit être ` + (chosen.type === 'white' ? 'BLANCHE' : 'NOIRE') + ' à cause de la parité.';
                     this.showHintPopup && this.showHintPopup(msg);
                     return;
                 }
@@ -2832,6 +2828,8 @@ class HexGridGame {
             if (chosen && chosen.constraint && chosen.constraint.dataset.constraintId) {
                 const type = chosen.constraint.dataset.constraintId[0];
                 const val = parseInt(chosen.constraint.dataset.constraintId.slice(1));
+                // Ne PAS surligner la zone concernée
+                // Surligner seulement la contrainte
                 this.highlightGameCellsByConstraint(type, val);
                 let msg = `Indice moyen : la zone ${chosen.zs.zoneId} doit être ` + (chosen.type === 'white' ? 'BLANCHE' : 'NOIRE') + ".";
                 this.showHintPopup && this.showHintPopup(msg);
@@ -2843,16 +2841,10 @@ class HexGridGame {
             if (chosen && chosen.constraint && chosen.constraint.dataset.constraintId) {
                 const t = chosen.constraint.dataset.constraintId[0];
                 const v = parseInt(chosen.constraint.dataset.constraintId.slice(1));
-                // Surligner la zone concernée
-                const zoneId = chosen.zs.zoneId;
-                const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"][data-zone-id="' + zoneId + '"]'));
-                gameCells.forEach(cell => {
-                    cell.setAttribute('stroke', '#fdcb6e');
-                    cell.setAttribute('stroke-width', '4');
-                });
-                // Surligner aussi la contrainte
+                // Ne PAS surligner la zone concernée
+                // Surligner seulement la contrainte
                 this.highlightGameCellsByConstraint(t, v);
-                let msg = `Indice difficile : la zone ${zoneId} (taille impaire) doit être ` + (chosen.type === 'white' ? 'BLANCHE' : 'NOIRE') + ' à cause de la parité.';
+                let msg = `Indice difficile : la zone ${chosen.zs.zoneId} (taille impaire) doit être ` + (chosen.type === 'white' ? 'BLANCHE' : 'NOIRE') + ' à cause de la parité.';
                 this.showHintPopup && this.showHintPopup(msg);
                 return;
             }
