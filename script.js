@@ -393,6 +393,7 @@ class HexGridGame {
         if (this.mode === 'game') {
             this.checkAndSaveProgress();
         }
+        if (typeof this.updateHintBtn === 'function') this.updateHintBtn();
     }
     
     updateDisplay() {
@@ -2687,9 +2688,9 @@ class HexGridGame {
             <div><b>actualBlack</b> : ${constraint.dataset.actual_black}</div>
             <div><b>actualWhite</b> : ${constraint.dataset.actual_white}</div>
             <div><b>cellCount</b> : ${constraint.dataset.cell_count}</div>
-            <div><b>hintEasy</b> : ${this.hintEasyList && this.hintEasyList.includes(constraint) ? 'true' : 'false'}</div>
-            <div><b>hintMedium</b> : ${this.hintMediumList && this.hintMediumList.some(h => h.constraint === constraint) ? 'true' : 'false'}</div>
-            <div><b>hintHard</b> : ${this.hintHardList && this.hintHardList.some(h => h.constraint === constraint) ? 'true' : 'false'}</div>
+            <div><b>hintEasy</b> : ${this.hintEasyList && this.hintEasyList.some(c => c.dataset && c.dataset.row === constraint.dataset.row && c.dataset.col === constraint.dataset.col) ? 'true' : 'false'}</div>
+            <div><b>hintMedium</b> : ${this.hintMediumList && this.hintMediumList.some(h => h.constraint && h.constraint.dataset && h.constraint.dataset.row === constraint.dataset.row && h.constraint.dataset.col === constraint.dataset.col) ? 'true' : 'false'}</div>
+            <div><b>hintHard</b> : ${this.hintHardList && this.hintHardList.some(h => h.constraint && h.constraint.dataset && h.constraint.dataset.row === constraint.dataset.row && h.constraint.dataset.col === constraint.dataset.col) ? 'true' : 'false'}</div>
         `;
         popup.appendChild(infos);
         // Affichage zoneStates
@@ -2714,14 +2715,17 @@ class HexGridGame {
     }
 
     updateHintBtn() {
+    console.log("updateHintBtn");
         const hintBtn = document.getElementById('hintBtn');
-        if (!hintBtn) return;
+        //if (!hintBtn) return;
         const constraints = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
+        //console.log(constraints.length)
         let nbHintEasy = 0, nbHintMedium = 0, nbHintHard = 0;
         this.hintEasyList = [];
         this.hintMediumList = [];
         this.hintHardList = [];
         constraints.forEach(constraint => {
+            
             const actualWhite = parseInt(constraint.dataset.actual_white || '0');
             const actualBlack = parseInt(constraint.dataset.actual_black || '0');
             const expectedBlack = parseInt(constraint.dataset.expected_black || '0');
@@ -2731,6 +2735,7 @@ class HexGridGame {
                 ((actualWhite === (cellCount - expectedBlack)) || (actualBlack === expectedBlack)) &&
                 (actualWhite + actualBlack < cellCount)
             ) {
+             console.log("hintEasy");
                 nbHintEasy++;
                 this.hintEasyList.push(constraint);
                 return; // Ne pas évaluer Hard/Medium si Easy trouvé
@@ -2774,12 +2779,14 @@ class HexGridGame {
                     const zs = maxZones[0];
                     // Règle 1 : zone doit être blanche
                     if (zs.count + actualBlack > expectedBlack) {
+                    console.log("hintMedium");
                         nbHintMedium++;
                         this.hintMediumList.push({constraint, zs, type: 'white'});
                         return;
                     }
                     // Règle 2 : zone doit être noire
                     if (zs.count + actualWhite > (cellCount - expectedBlack)) {
+                    console.log("hintMedium");
                         nbHintMedium++;
                         this.hintMediumList.push({constraint, zs, type: 'black'});
                         return;
