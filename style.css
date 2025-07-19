@@ -354,7 +354,7 @@ body > div[style*='display: flex'] {
     position: absolute;
     top: 0;
     left: 0;
-    width: 300px;
+    width: 350px;
     height: 100%;
     background: #fff;
     padding: 20px;
@@ -438,21 +438,19 @@ body > div[style*='display: flex'] {
 } 
 
 /* Style pour la combo dans le menu hamburger */
-#gridSelector {
-    display: block;
+.menu-select, #gridSelector {
     width: 100%;
-    padding: 12px 15px;
-    margin: 8px 0;
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: #fff;
     color: #333;
-    font-size: 14px;
-    transition: 0.2s;
+    margin-bottom: 8px;
     box-sizing: border-box;
+    transition: border-color 0.3s ease;
 }
-#gridSelector:focus {
+.menu-select:focus, #gridSelector:focus {
     outline: none;
     border-color: #667eea;
-    background: #eef2fb;
 } 

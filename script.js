@@ -28,8 +28,6 @@ class HexGridGame {
         // NE PAS générer la grille ici, attendre window.onload
         this.bindModeToggle();
         this.updateYamlExport();
-        this.setYamlExportVisibility();
-        this.setControlsVisibility();
         // Dans le constructeur de HexGridGame, après initializeElements :
         const gridSelector = document.getElementById('gridSelector');
         if (gridSelector) gridSelector.style.display = '';
@@ -272,6 +270,9 @@ class HexGridGame {
             if (callback) {
                 callback();
             }
+            // Appeler setYamlExportVisibility et setControlsVisibility à la toute fin
+            if (typeof this.setYamlExportVisibility === 'function') this.setYamlExportVisibility();
+            if (typeof this.setControlsVisibility === 'function') this.setControlsVisibility();
         };
         
         // Si un callback est fourni, exécuter immédiatement (pour les tests)
@@ -1104,6 +1105,7 @@ class HexGridGame {
     }
 
     loadGridFromConf(conf) {
+        this.mode = 'game'; // Forcer le mode GAME lors du chargement d'une grille prédéfinie
         // Générer la grille à partir de textual_grid et constraints
         if (conf.textual_grid) {
             this.generateGridFromTextualGrid(conf.textual_grid, conf.constraints, conf.textual_zones);
@@ -1129,6 +1131,7 @@ class HexGridGame {
         } else {
             this.generateGrid();
         }
+        this.setYamlExportVisibility();
     }
 
     generateGridFromTextualGrid(textual, constraints, textual_zones) {
@@ -1255,6 +1258,8 @@ class HexGridGame {
             
             // S'assurer que les contrôles de jeu sont bien positionnés
             this.repositionGameControls();
+        this.setYamlExportVisibility();
+        this.setControlsVisibility();
     }
 
     detectGridSizeFromTextualGrid(textual) {
@@ -1758,6 +1763,18 @@ class HexGridGame {
         if (this.controlsDiv) {
             this.controlsDiv.style.display = (this.mode === 'edit') ? '' : 'none';
         }
+        const gridSizeInput = document.getElementById('gridSize');
+        if (gridSizeInput) {
+            // Masquer le parent .control-group si présent
+            const group = gridSizeInput.closest('.control-group');
+            if (group) {
+                group.style.display = (this.mode === 'edit') ? '' : 'none';
+            } else {
+                gridSizeInput.style.display = (this.mode === 'edit') ? '' : 'none';
+                const label = document.querySelector('label[for="gridSize"]');
+                if (label) label.style.display = (this.mode === 'edit') ? '' : 'none';
+            }
+        }
     }
 
     // Génère une grille aléatoire, affecte les contraintes et crée des zones de 2 à 5 cellules consécutives de même état
@@ -1832,23 +1849,19 @@ class HexGridGame {
             // S'assurer que les contrôles de jeu sont bien positionnés
             this.repositionGameControls();
         });
+        this.setControlsVisibility();
     }
 
     // Génère une grille déterministe basée sur une graine
-    generateSeededPuzzle(seed) {
-        // Réinitialiser le compteur de coups
+    generateSeededPuzzle(seed, diffVal=0) {
+        this.mode = 'game'; // Forcer le mode GAME ici aussi
         this.moveCount = 0;
         this.moveHistory = [];
         this.updateMoveCounter();
-        
-        // Créer un générateur de nombres aléatoires basé sur la graine
         const random = this.seededRandom(seed);
-        
         this.generateGrid(() => {
-            // 1. Mettre toutes les cellules de jeu à un état déterministe (NOIR ou BLANC)
             const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
             gameCells.forEach(cell => {
-                // Utiliser le générateur déterministe au lieu de Math.random()
                 const state = random() < 0.5 ? 1 : 2;
                 cell.dataset.state = state;
                 if (state === 1) {
@@ -1860,20 +1873,12 @@ class HexGridGame {
                 cell.setAttribute('stroke-width', '0');
                 delete cell.dataset.zoneId;
             });
-            
-            // 2. Créer les zones de 2 à N/2 cellules consécutives de même état
-            this.createZonesForCurrentStates(gameCells, this.gridSize);
-            
-            // 3. Mettre à jour actual_black pour chaque contrainte
+            this.createZonesForCurrentStates(gameCells, this.gridSize, diffVal);
             this.updateAllActualBlack();
-            
-            // 4. Copier actual_black dans expected_black pour chaque contrainte
             const constraintCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
             constraintCells.forEach(cell => {
                 cell.dataset.expected_black = cell.dataset.actual_black;
             });
-            
-            // 5. Remettre toutes les cellules de jeu à GRIS
             gameCells.forEach(cell => {
                 cell.dataset.state = 0;
                 let fillColor;
@@ -1882,35 +1887,30 @@ class HexGridGame {
                 } else if (cell.dataset.zoneId) {
                     fillColor = this.getZoneColor(cell.dataset.zoneId);
                 } else {
-                    fillColor = '#b2bec3'; // fallback gris si jamais
+                    fillColor = '#b2bec3';
                 }
                 cell.setAttribute('fill', fillColor);
                 cell.setAttribute('stroke', 'none');
                 cell.setAttribute('stroke-width', '0');
             });
-            
-            // 6. Mettre à jour l'affichage des contraintes et l'export YAML
             this.updateConstraintTexts();
-            // Remettre à 0 toutes les valeurs actual_black des contraintes
             const constraintCells2 = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
             constraintCells2.forEach(cell => { cell.dataset.actual_black = 0; });
             this.updateConstraintColors();
             this.updateYamlExport();
-            //this.updateConstraintColors();
-            // Animation désactivée par défaut
-            // this.startZoneColorAnimation();
-            
-            // S'assurer que les contrôles de jeu sont bien positionnés
             this.repositionGameControls();
             this.updateAllActualBlack();
+            this.setYamlExportVisibility();
+            this.setControlsVisibility();
         });
     }
 
     // Crée des zones de 2 à maxZoneSize cellules consécutives de même état
-    createZonesForCurrentStates(gameCells, N) {
+    createZonesForCurrentStates(gameCells, N, difficulty=0) {
         //const maxZoneSize = Math.max(2, Math.floor(N / 2)+2);
-        const maxZoneSize = N+2;
-        
+        // Difficulty EASY+1 , MEDIUM=0, HARD-1
+        const maxZoneSize = N + difficulty;
+        console.log("maxZoneSize", maxZoneSize);
         // Génère des zoneId : A, B, ..., Z, AA, AB, ...
         function* zoneIdGenerator() {
             const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -2233,39 +2233,46 @@ class HexGridGame {
         return Math.abs(hash);
     }
 
-    // Parse un ID_JEU (ex: "5-42")
+    // Parse un ID_JEU (ex: "5-42" ou "9-42-HARD")
     parseGameId(gameId) {
-        const match = gameId.match(/^(\d+)-(\d+)$/);
+        // Nouveau format : taille-numero-difficulte (difficulte optionnelle)
+        const match = gameId.match(/^(\d+)-(\d+)(?:-([A-Z]+))?$/i);
         if (!match) {
-            throw new Error(`Format d'ID_JEU invalide: ${gameId}. Format attendu: taille-numero`);
+            throw new Error(`Format d'ID_JEU invalide: ${gameId}. Format attendu: taille-numero[-difficulte]`);
+        }
+        let difficulty = 'MEDIUM';
+        if (match[3]) {
+            const d = match[3].toUpperCase();
+            if (["EASY","MEDIUM","HARD"].includes(d)) difficulty = d;
         }
         return {
             size: parseInt(match[1]),
-            gameNumber: parseInt(match[2])
+            gameNumber: parseInt(match[2]),
+            difficulty
         };
     }
 
     // Génère une grille à partir d'un ID_JEU
     generateGridFromGameId(gameId) {
         try {
-            const { size, gameNumber } = this.parseGameId(gameId);
+            const { size, gameNumber, difficulty } = this.parseGameId(gameId);
             const seed = this.generateSeedFromGameNumber(gameNumber);
-            
             this.currentGameId = gameId;
             this.currentSeed = seed;
             this.gridSize = size;
-            
-            console.log(`Génération de la grille ${gameId} avec la graine ${seed}`);
-            
+            this.currentDifficulty = difficulty;
+            this.mode = 'game'; // Forcer le mode GAME lors du chargement par ID
+            // Pour createZonesForCurrentStates
+            let diffVal = 0;
+            if (difficulty === 'EASY') diffVal = 1;
+            else if (difficulty === 'HARD') diffVal = -1;
             // Mettre à jour l'URL
             this.updateUrlWithGameId(gameId);
-            
             // Mettre à jour l'affichage de l'ID
             this.updateGameIdDisplay();
-            
-            // Générer la grille avec la graine
-            this.generateSeededPuzzle(seed);
-            
+            // Générer la grille avec la graine et la difficulté
+            this.generateSeededPuzzle(seed, diffVal);
+            this.setYamlExportVisibility();
         } catch (error) {
             console.error('Erreur lors de la génération de la grille:', error.message);
             // Fallback vers une grille aléatoire
@@ -2302,6 +2309,50 @@ class HexGridGame {
         const menuOverlay = document.getElementById('menuOverlay');
         const menuButtons = document.querySelectorAll('.menu-btn');
 
+        // --- Ajout du sélecteur de difficulté ---
+        let diffSelector = document.getElementById('difficultySelector');
+        if (!diffSelector) {
+            // Créer le label comme pour les grilles prédéfinies
+            const diffLabel = document.createElement('label');
+            diffLabel.setAttribute('for', 'difficultySelector');
+            diffLabel.textContent = 'Difficulté :';
+            diffLabel.style.display = 'block';
+            diffLabel.style.margin = '8px 0 2px 0';
+            diffSelector = document.createElement('select');
+            diffSelector.id = 'difficultySelector';
+            diffSelector.className = 'menu-select'; // même style que gridSelector
+            diffSelector.style.margin = '8px 0 16px 0';
+            diffSelector.style.fontSize = '1em';
+            ['EASY','MEDIUM','HARD'].forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d;
+                opt.textContent = d.charAt(0) + d.slice(1).toLowerCase();
+                diffSelector.appendChild(opt);
+            });
+            // Charger la difficulté depuis le localStorage si dispo
+            const savedDiff = localStorage.getItem('hexalogic_selected_difficulty');
+            if (savedDiff && ['EASY','MEDIUM','HARD'].includes(savedDiff)) diffSelector.value = savedDiff;
+            // Ajouter dans la première section du menu hamburger
+            const menuSections = document.querySelectorAll('.menu-section');
+            if (menuSections.length > 0) {
+                menuSections[0].insertBefore(diffLabel, menuSections[0].firstChild);
+                menuSections[0].insertBefore(diffSelector, menuSections[0].firstChild.nextSibling);
+            } else {
+                menuOverlay.insertBefore(diffLabel, menuOverlay.firstChild);
+                menuOverlay.insertBefore(diffSelector, menuOverlay.firstChild);
+            }
+        }
+        // Mémoriser la difficulté sélectionnée
+        diffSelector.onchange = () => {
+            localStorage.setItem('hexalogic_selected_difficulty', diffSelector.value);
+            this.selectedDifficulty = diffSelector.value;
+            this.updateMenuProgress();
+        };
+        // Initialiser la difficulté sélectionnée
+        this.selectedDifficulty = diffSelector.value;
+
+        // --- Fin ajout sélecteur difficulté ---
+
         // Toggle du menu
         hamburgerIcon.addEventListener('click', () => {
             this.toggleMenu();
@@ -2322,10 +2373,11 @@ class HexGridGame {
             btn.addEventListener('click', (e) => {
                 const action = btn.dataset.action;
                 const size = btn.dataset.size;
-                
+                // --- Utiliser la difficulté sélectionnée pour la génération ---
+                const difficulty = this.selectedDifficulty || 'MEDIUM';
                 switch (action) {
                     case 'grid':
-                        this.generateGridBySize(parseInt(size));
+                        this.generateGridBySize(parseInt(size), difficulty);
                         break;
                     case 'random':
                         this.generateRandomPuzzle();
@@ -2366,24 +2418,24 @@ class HexGridGame {
                 menuOverlay.appendChild(debugBtn);
             }
         }
-        // Ajouter le bouton HINT si pas déjà présent
-        let hintBtn = document.getElementById('hintBtn');
-        if (!hintBtn) {
-            hintBtn = document.createElement('button');
-            hintBtn.id = 'hintBtn';
-            hintBtn.className = 'menu-btn';
-            hintBtn.style.background = '#f8f9fa';
-            hintBtn.style.color = '#333';
-            hintBtn.style.fontWeight = 'bold';
-            hintBtn.onclick = () => { this.showHint(); };
-            // Ajouter dans la dernière section du menu hamburger
-            const menuSections = document.querySelectorAll('.menu-section');
-            if (menuSections.length > 0) {
-                menuSections[menuSections.length - 1].appendChild(hintBtn);
+
+        let hintSection = document.getElementById('hintSection');
+        if (!hintSection) {
+            hintSection = document.createElement('div');
+            hintSection.className = 'menu-section';
+            hintSection.id = 'hintSection';
+            const h4 = document.createElement('h4');
+            h4.textContent = 'Indices';
+            hintSection.appendChild(h4);
+            // Ajouter avant le bouton Fermer le menu
+            const closeBtn = menuOverlay.querySelector('.close-btn');
+            if (closeBtn && closeBtn.parentNode) {
+                closeBtn.parentNode.insertBefore(hintSection, closeBtn);
             } else {
-                menuOverlay.appendChild(hintBtn);
+                menuOverlay.appendChild(hintSection);
             }
         }
+
         // Boutons HINT séparés
         let hintEasyBtn = document.getElementById('hintEasyBtn');
         if (!hintEasyBtn) {
@@ -2393,13 +2445,9 @@ class HexGridGame {
             hintEasyBtn.style.background = '#f8f9fa';
             hintEasyBtn.style.color = '#333';
             hintEasyBtn.style.fontWeight = 'bold';
+            hintEasyBtn.textContent = 'HINT EASY (0)';
             hintEasyBtn.onclick = () => { this.showHintType('easy'); };
-            const menuSections = document.querySelectorAll('.menu-section');
-            if (menuSections.length > 0) {
-                menuSections[menuSections.length - 1].appendChild(hintEasyBtn);
-            } else {
-                menuOverlay.appendChild(hintEasyBtn);
-            }
+            hintSection.appendChild(hintEasyBtn);
         }
         let hintMediumBtn = document.getElementById('hintMediumBtn');
         if (!hintMediumBtn) {
@@ -2409,13 +2457,9 @@ class HexGridGame {
             hintMediumBtn.style.background = '#f8f9fa';
             hintMediumBtn.style.color = '#333';
             hintMediumBtn.style.fontWeight = 'bold';
+            hintMediumBtn.textContent = 'HINT MEDIUM (0)';
             hintMediumBtn.onclick = () => { this.showHintType('medium'); };
-            const menuSections = document.querySelectorAll('.menu-section');
-            if (menuSections.length > 0) {
-                menuSections[menuSections.length - 1].appendChild(hintMediumBtn);
-            } else {
-                menuOverlay.appendChild(hintMediumBtn);
-            }
+            hintSection.appendChild(hintMediumBtn);
         }
         let hintHardBtn = document.getElementById('hintHardBtn');
         if (!hintHardBtn) {
@@ -2425,29 +2469,22 @@ class HexGridGame {
             hintHardBtn.style.background = '#f8f9fa';
             hintHardBtn.style.color = '#333';
             hintHardBtn.style.fontWeight = 'bold';
+            hintHardBtn.textContent = 'HINT HARD (0)';
             hintHardBtn.onclick = () => { this.showHintType('hard'); };
-            const menuSections = document.querySelectorAll('.menu-section');
-            if (menuSections.length > 0) {
-                menuSections[menuSections.length - 1].appendChild(hintHardBtn);
-            } else {
-                menuOverlay.appendChild(hintHardBtn);
-            }
+            hintSection.appendChild(hintHardBtn);
         }
         this.updateHintBtn && this.updateHintBtn();
     }
 
     // Génère une grille de taille spécifique
-    generateGridBySize(size) {
+    generateGridBySize(size, difficulty='MEDIUM') {
         this.gridSize = size;
-        
-        // Récupérer le dernier niveau complété pour cette taille
-        const lastCompleted = this.getLastCompletedLevel(size);
+        // Récupérer le dernier niveau complété pour cette taille ET difficulté
+        const lastCompleted = this.getLastCompletedLevel(size, difficulty);
         const nextLevel = lastCompleted + 1;
-        
         // Générer la grille avec le niveau suivant
-        const gameId = `${size}-${nextLevel}`;
+        const gameId = `${size}-${nextLevel}-${difficulty}`;
         this.generateGridFromGameId(gameId);
-        
         this.closeMenu();
     }
 
@@ -2469,6 +2506,8 @@ class HexGridGame {
         this.closeMenu();
         if (this.mode === 'edit') {
             this.generateGrid();
+        } else {
+            this.setYamlExportVisibility();
         }
     }
 
@@ -2517,22 +2556,21 @@ class HexGridGame {
     updateAnimationButton(isOn) {
         const animBtn = document.querySelector('[data-action="toggle-animation"]');
         if (animBtn) {
-            animBtn.textContent = isOn ? 'Animation OFF' : 'Animation ON';
+            animBtn.textContent = isOn ? 'Animation ON' : 'Animation OFF';
         }
     }
 
     // Met à jour l'affichage de la progression dans le menu
     updateMenuProgress() {
-        const sizes = [3, 4, 5, 7, 9];
-        
+        const sizes = [3, 4, 5, 6, 7, 8, 9];
+        // Utiliser la difficulté sélectionnée
+        let difficulty = this.selectedDifficulty || 'MEDIUM';
         sizes.forEach(size => {
             const btn = document.querySelector(`[data-action="grid"][data-size="${size}"]`);
             if (btn) {
-                const lastCompleted = this.getLastCompletedLevel(size);
+                const lastCompleted = this.getLastCompletedLevel(size, difficulty);
                 const nextLevel = lastCompleted + 1;
-                btn.textContent = `Grille d'ordre ${size} (Niveau ${nextLevel})`;
-                
-                // Ajouter un indicateur visuel si des niveaux sont complétés
+                btn.textContent = `Grille d'ordre ${size} (${difficulty}) (Niveau ${nextLevel})`;
                 if (lastCompleted > 0) {
                     btn.style.background = '#e8f5e8';
                     btn.style.borderColor = '#28a745';
@@ -2544,22 +2582,20 @@ class HexGridGame {
         });
     }
 
-    // Récupère le dernier niveau complété pour une taille donnée
-    getLastCompletedLevel(size) {
-        const key = `hexalogic_completed_${size}`;
+    // Récupère le dernier niveau complété pour une taille et difficulté donnée
+    getLastCompletedLevel(size, difficulty='MEDIUM') {
+        const key = `hexalogic_completed_${size}_${difficulty}`;
         const completed = localStorage.getItem(key);
         return completed ? parseInt(completed) : 0;
     }
 
     // Enregistre un niveau complété
-    saveCompletedLevel(size, level) {
-        const key = `hexalogic_completed_${size}`;
-        const currentMax = this.getLastCompletedLevel(size);
-        
-        // Ne sauvegarder que si c'est un nouveau record
+    saveCompletedLevel(size, level, difficulty='MEDIUM') {
+        const key = `hexalogic_completed_${size}_${difficulty}`;
+        const currentMax = this.getLastCompletedLevel(size, difficulty);
         if (level > currentMax) {
             localStorage.setItem(key, level.toString());
-            console.log(`Niveau ${size}-${level} complété ! Nouveau record pour la taille ${size}`);
+            console.log(`Niveau ${size}-${level} (${difficulty}) complété ! Nouveau record pour la taille ${size}`);
             return true;
         }
         return false;
@@ -2568,19 +2604,15 @@ class HexGridGame {
     // Vérifie si une grille est complétée et sauvegarde la progression
     checkAndSaveProgress() {
         if (!this.currentGameId) return;
-        
-        const { size, gameNumber } = this.parseGameId(this.currentGameId);
-        
-        // Vérifier si toutes les contraintes sont satisfaites
+        const { size, gameNumber, difficulty } = this.parseGameId(this.currentGameId);
         const constraintCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
         const allConstraintsMet = constraintCells.every(cell => {
             const expected = parseInt(cell.dataset.expected_black || '0');
             const actual = parseInt(cell.dataset.actual_black || '0');
             return expected === actual;
         });
-        
         if (allConstraintsMet) {
-            const isNewRecord = this.saveCompletedLevel(size, gameNumber);
+            const isNewRecord = this.saveCompletedLevel(size, gameNumber, difficulty);
             if (isNewRecord) {
                 this.showVictoryMessage(true);
             } else {
@@ -2701,7 +2733,28 @@ class HexGridGame {
             ) {
                 nbHintEasy++;
                 this.hintEasyList.push(constraint);
-                return; // Ne pas évaluer Medium/Hard si Easy trouvé
+                return; // Ne pas évaluer Hard/Medium si Easy trouvé
+            }
+            // HintHard : règle de parité sur zone grise impaire unique
+            if (constraint.zoneStates && constraint.zoneStates.length > 0) {
+                // Lister les zones grises (state=0) de taille impaire
+                const grayOddZones = constraint.zoneStates.filter(zs => zs.state === 0 && zs.count % 2 === 1);
+                if (grayOddZones.length === 1) {
+                    const zs = grayOddZones[0];
+                    // Parité expectedBlack/actualBlack
+                    if ((expectedBlack % 2 !== actualBlack % 2)) {
+                        nbHintHard++;
+                        this.hintHardList.push({constraint, zs, type: 'black', reason: 'parity-black'});
+                        return; // Ne pas évaluer Medium si Hard trouvé
+                    }
+                    // Parité expectedWhite/actualWhite
+                    const expectedWhite = cellCount - expectedBlack;
+                    if ((expectedWhite % 2 !== actualWhite % 2)) {
+                        nbHintHard++;
+                        this.hintHardList.push({constraint, zs, type: 'white', reason: 'parity-white'});
+                        return; // Ne pas évaluer Medium si Hard trouvé
+                    }
+                }
             }
             // HintMedium
             if (constraint.zoneStates && constraint.zoneStates.length > 0) {
@@ -2723,32 +2776,13 @@ class HexGridGame {
                     if (zs.count + actualBlack > expectedBlack) {
                         nbHintMedium++;
                         this.hintMediumList.push({constraint, zs, type: 'white'});
-                        return; // Ne pas évaluer Hard si Medium trouvé
+                        return;
                     }
                     // Règle 2 : zone doit être noire
                     if (zs.count + actualWhite > (cellCount - expectedBlack)) {
                         nbHintMedium++;
                         this.hintMediumList.push({constraint, zs, type: 'black'});
-                        return; // Ne pas évaluer Hard si Medium trouvé
-                    }
-                }
-            }
-            // HintHard : règle de parité sur zone grise impaire unique
-            if (constraint.zoneStates && constraint.zoneStates.length > 0) {
-                // Lister les zones grises (state=0) de taille impaire
-                const grayOddZones = constraint.zoneStates.filter(zs => zs.state === 0 && zs.count % 2 === 1);
-                if (grayOddZones.length === 1) {
-                    const zs = grayOddZones[0];
-                    // Parité expectedBlack/actualBlack
-                    if ((expectedBlack % 2 !== actualBlack % 2)) {
-                        nbHintHard++;
-                        this.hintHardList.push({constraint, zs, type: 'black', reason: 'parity-black'});
-                    }
-                    // Parité expectedWhite/actualWhite
-                    const expectedWhite = cellCount - expectedBlack;
-                    if ((expectedWhite % 2 !== actualWhite % 2)) {
-                        nbHintHard++;
-                        this.hintHardList.push({constraint, zs, type: 'white', reason: 'parity-white'});
+                        return;
                     }
                 }
             }
@@ -2925,8 +2959,11 @@ window.addEventListener('load', () => {
     if (gameIdFromUrl) {
         console.log(`Chargement de la grille depuis l'URL: ${gameIdFromUrl}`);
         game.generateGridFromGameId(gameIdFromUrl);
+        game.mode = 'game'; // Forcer le mode GAME lors du chargement initial
     } else if (window.GRIDS_DEFINITION && window.GRIDS_DEFINITION.length > 0) {
+        game.mode = 'game'; // Forcer le mode GAME lors du chargement initial
         game.loadGridFromConf(window.GRIDS_DEFINITION[0]);
+        //game.setYamlExportVisibility();
     } else {
         game.generateGrid();
     }
@@ -2987,4 +3024,6 @@ window.addEventListener('load', () => {
             document.body.appendChild(gameControls);
         }
     }
+    // Forcer la visibilité correcte du YAML après tout
+    //game.setYamlExportVisibility();
 }); 
