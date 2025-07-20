@@ -382,15 +382,17 @@ class HexGridGame {
                 cell.dataset.actual_black = val;
             }
         });
+        // Mise à jour des contraintes
         this.updateConstraintTexts();
         this.updateConstraintColors();
         if (this.mode === 'edit') {
             this.updateYamlExport();
         }
         this.updateZoneBorders();
-        
-        // Vérifier la progression si on est en mode jeu
+        // Appel systématique pour garantir la cohérence
         if (this.mode === 'game') {
+            this.updateAllActualBlack();
+            this.updateConstraintColors();
             this.checkAndSaveProgress();
         }
         if (typeof this.updateHintBtn === 'function') this.updateHintBtn();
@@ -2254,6 +2256,7 @@ class HexGridGame {
             let diffVal = 0;
             if (difficulty === 'EASY') diffVal = 1;
             else if (difficulty === 'HARD') diffVal = -1;
+            else if (difficulty === 'HARDER') diffVal = -2;
             // Mettre à jour l'URL
             this.updateUrlWithGameId(gameId);
             // Mettre à jour l'affichage de l'ID
@@ -2311,7 +2314,7 @@ class HexGridGame {
             diffSelector.className = 'menu-select'; // même style que gridSelector
             diffSelector.style.margin = '8px 0 16px 0';
             diffSelector.style.fontSize = '1em';
-            ['EASY','MEDIUM','HARD'].forEach(d => {
+            ['EASY','MEDIUM','HARD','HARDER'].forEach(d => {
                 const opt = document.createElement('option');
                 opt.value = d;
                 opt.textContent = d.charAt(0) + d.slice(1).toLowerCase();
@@ -2319,7 +2322,7 @@ class HexGridGame {
             });
             // Charger la difficulté depuis le localStorage si dispo
             const savedDiff = localStorage.getItem('hexalogic_selected_difficulty');
-            if (savedDiff && ['EASY','MEDIUM','HARD'].includes(savedDiff)) diffSelector.value = savedDiff;
+            if (savedDiff && ['EASY','MEDIUM','HARD','HARDER'].includes(savedDiff)) diffSelector.value = savedDiff;
             // Ajouter dans la première section du menu hamburger
             const menuSections = document.querySelectorAll('.menu-section');
             if (menuSections.length > 0) {
@@ -2554,6 +2557,7 @@ class HexGridGame {
         const sizes = [3, 4, 5, 6, 7, 8, 9];
         // Utiliser la difficulté sélectionnée
         let difficulty = this.selectedDifficulty || 'MEDIUM';
+        const difficulties = ['EASY','MEDIUM','HARD','HARDER'];
         sizes.forEach(size => {
             const btn = document.querySelector(`[data-action="grid"][data-size="${size}"]`);
             if (btn) {
