@@ -154,6 +154,7 @@ class HexGridGame {
 
     generateGrid(callback = null) {
         this.hasPlayed = false;
+        this.victoryAllowed = false;
         console.log('[DEBUG] generateGrid: selectedDifficulty =', this.selectedDifficulty);
         this.victoryShown = false;
         // Cacher le message de victoire à chaque régénération
@@ -1113,7 +1114,7 @@ class HexGridGame {
 
     loadGridFromConf(conf) {
         this.hasPlayed = false;
-        this.victoryShown = false;
+        this.victoryAllowed = false;
         this.mode = 'game'; // Forcer le mode GAME lors du chargement d'une grille prédéfinie
         // Générer la grille à partir de textual_grid et constraints
         if (conf.textual_grid) {
@@ -1145,7 +1146,7 @@ class HexGridGame {
 
     generateGridFromTextualGrid(textual, constraints, textual_zones) {
         this.hasPlayed = false;
-        this.victoryShown = false;
+        this.victoryAllowed = false;
         // Cacher le message de victoire à chaque régénération
         const msgDiv = document.getElementById('victoryMsg');
         if (msgDiv) msgDiv.style.display = 'none';
@@ -1462,6 +1463,8 @@ class HexGridGame {
     }
 
     showVictoryMessage(allOk) {
+
+        if (!this.victoryAllowed) { return }
         let msgDiv = document.getElementById('victoryMsg');
         console.log('showVictoryMessage appelé avec allOk =', allOk);
         if (!msgDiv) {
@@ -1795,7 +1798,7 @@ class HexGridGame {
     // Génère une grille aléatoire, affecte les contraintes et crée des zones de 2 à 5 cellules consécutives de même état
     generateRandomPuzzle() {
         this.hasPlayed = false;
-        this.victoryShown = false;
+        this.victoryAllowed = false;
         // 0. Choisir N aléatoirement entre 3 et 10 et régénérer la grille
         const N = Math.floor(Math.random() * 8) + 3; // 3 à 10 inclus
         this.gridSize = N;
@@ -1871,6 +1874,7 @@ class HexGridGame {
     // Génère une grille déterministe basée sur une graine
     generateSeededPuzzle(seed, diffVal=0) {
         this.hasPlayed = false;
+        this.victoryAllowed = false;
         this.mode = 'game'; // Forcer le mode GAME ici aussi
         this.moveCount = 0;
         this.moveHistory = [];
@@ -2259,6 +2263,7 @@ class HexGridGame {
     // Génère une grille à partir d'un ID_JEU
     generateGridFromGameId(gameId) {
         this.hasPlayed = false;
+        this.victoryAllowed = false;
         console.log('[DEBUG] generateGridFromGameId: selectedDifficulty =', this.selectedDifficulty);
         this.victoryShown = false;
         try {
@@ -2281,6 +2286,8 @@ class HexGridGame {
             // Générer la grille avec la graine et la difficulté
             this.generateSeededPuzzle(seed, diffVal);
             this.setYamlExportVisibility();
+            console.log('Ready to play')
+            this.victoryAllowed = true;
         } catch (error) {
             console.error('Erreur lors de la génération de la grille:', error.message);
             // Fallback vers une grille aléatoire
@@ -2487,7 +2494,7 @@ class HexGridGame {
     // Génère une grille de taille spécifique
     generateGridBySize(size, difficulty='MEDIUM') {
         this.hasPlayed = false;
-        this.victoryShown = false;
+        this.victoryAllowed = false;
         this.gridSize = size;
         // Récupérer le dernier niveau complété pour cette taille ET difficulté
         const lastCompleted = this.getLastCompletedLevel(size, difficulty);
@@ -2621,6 +2628,9 @@ class HexGridGame {
     checkAndSaveProgress() {
         if (!this.currentGameId) return;
         if (!this.hasPlayed) return;
+        if (!this.victoryAllowed) return;
+        // Mettre à jour les contraintes avant de vérifier la victoire
+        this.updateAllActualBlack();
         const { size, gameNumber, difficulty } = this.parseGameId(this.currentGameId);
         const constraintCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
         const allConstraintsMet = constraintCells.every(cell => {
@@ -2628,7 +2638,6 @@ class HexGridGame {
             const actual = parseInt(cell.dataset.actual_black || '0');
             return expected === actual;
         });
-        console.log("checkAndSaveProgress " + allConstraintsMet)
         if (allConstraintsMet) {
             const isNewRecord = this.saveCompletedLevel(size, gameNumber, difficulty);
             if (isNewRecord) {
@@ -3124,7 +3133,7 @@ window.addEventListener('load', () => {
         gameIdDisplay.style.display = 'inline-block';
         
         
-        this.setGameUIVisibility();
+        if (typeof this.setGameUIVisibility === 'function') this.setGameUIVisibility();
 
 
     }    
