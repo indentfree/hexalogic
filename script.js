@@ -583,6 +583,8 @@ class HexGridGame {
                         this.updateYamlExport();
                     }
                     if (this.mode === 'game') {
+                        this.updateAllActualBlack();
+                        this.updateConstraintColors();
                         this.checkAndSaveProgress();
                     }
                 } else {
