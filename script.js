@@ -1563,9 +1563,9 @@ class HexGridGame {
     // Aller au niveau suivant
     goToNextLevel() {
         if (!this.currentGameId) return;
-        const { size, gameNumber } = this.parseGameId(this.currentGameId);
+        const { size, gameNumber, difficulty } = this.parseGameId(this.currentGameId);
         const nextLevel = gameNumber + 1;
-        const nextGameId = `${size}-${nextLevel}`;
+        const nextGameId = `${size}-${nextLevel}-${difficulty}`;
         this.generateGridFromGameId(nextGameId);
     }
 
