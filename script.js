@@ -153,6 +153,9 @@ class HexGridGame {
     }
 
     generateGrid(callback = null) {
+        this.hasPlayed = false;
+        console.log('[DEBUG] generateGrid: selectedDifficulty =', this.selectedDifficulty);
+        this.victoryShown = false;
         // Cacher le message de victoire à chaque régénération
         const msgDiv = document.getElementById('victoryMsg');
         if (msgDiv) msgDiv.style.display = 'none';
@@ -391,6 +394,7 @@ class HexGridGame {
         this.updateZoneBorders();
         // Appel systématique pour garantir la cohérence
         if (this.mode === 'game') {
+            this.hasPlayed = true;
             this.updateAllActualBlack();
             this.updateConstraintColors();
             this.checkAndSaveProgress();
@@ -1108,6 +1112,8 @@ class HexGridGame {
     }
 
     loadGridFromConf(conf) {
+        this.hasPlayed = false;
+        this.victoryShown = false;
         this.mode = 'game'; // Forcer le mode GAME lors du chargement d'une grille prédéfinie
         // Générer la grille à partir de textual_grid et constraints
         if (conf.textual_grid) {
@@ -1138,6 +1144,8 @@ class HexGridGame {
     }
 
     generateGridFromTextualGrid(textual, constraints, textual_zones) {
+        this.hasPlayed = false;
+        this.victoryShown = false;
         // Cacher le message de victoire à chaque régénération
         const msgDiv = document.getElementById('victoryMsg');
         if (msgDiv) msgDiv.style.display = 'none';
@@ -1455,6 +1463,7 @@ class HexGridGame {
 
     showVictoryMessage(allOk) {
         let msgDiv = document.getElementById('victoryMsg');
+        console.log('showVictoryMessage appelé avec allOk =', allOk);
         if (!msgDiv) {
             msgDiv = document.createElement('div');
             msgDiv.id = 'victoryMsg';
@@ -1513,6 +1522,7 @@ class HexGridGame {
             document.body.appendChild(msgDiv);
         }
         if (allOk) {
+            this.victoryShown = true;
             // Nettoyer le contenu sauf les boutons
             msgDiv.innerHTML = '';
             // Bouton X
@@ -1559,6 +1569,7 @@ class HexGridGame {
             msgDiv.appendChild(nextBtn);
             msgDiv.style.display = '';
         } else {
+            if (this.victoryShown) return;
             msgDiv.style.display = 'none';
         }
     }
@@ -1783,6 +1794,8 @@ class HexGridGame {
 
     // Génère une grille aléatoire, affecte les contraintes et crée des zones de 2 à 5 cellules consécutives de même état
     generateRandomPuzzle() {
+        this.hasPlayed = false;
+        this.victoryShown = false;
         // 0. Choisir N aléatoirement entre 3 et 10 et régénérer la grille
         const N = Math.floor(Math.random() * 8) + 3; // 3 à 10 inclus
         this.gridSize = N;
@@ -1857,6 +1870,7 @@ class HexGridGame {
 
     // Génère une grille déterministe basée sur une graine
     generateSeededPuzzle(seed, diffVal=0) {
+        this.hasPlayed = false;
         this.mode = 'game'; // Forcer le mode GAME ici aussi
         this.moveCount = 0;
         this.moveHistory = [];
@@ -2233,7 +2247,7 @@ class HexGridGame {
         let difficulty = 'MEDIUM';
         if (match[3]) {
             const d = match[3].toUpperCase();
-            if (["EASY","MEDIUM","HARD"].includes(d)) difficulty = d;
+            if (["EASY","MEDIUM","HARD","HARDER"].includes(d)) difficulty = d;
         }
         return {
             size: parseInt(match[1]),
@@ -2244,6 +2258,9 @@ class HexGridGame {
 
     // Génère une grille à partir d'un ID_JEU
     generateGridFromGameId(gameId) {
+        this.hasPlayed = false;
+        console.log('[DEBUG] generateGridFromGameId: selectedDifficulty =', this.selectedDifficulty);
+        this.victoryShown = false;
         try {
             const { size, gameNumber, difficulty } = this.parseGameId(gameId);
             const seed = this.generateSeedFromGameNumber(gameNumber);
@@ -2469,6 +2486,8 @@ class HexGridGame {
 
     // Génère une grille de taille spécifique
     generateGridBySize(size, difficulty='MEDIUM') {
+        this.hasPlayed = false;
+        this.victoryShown = false;
         this.gridSize = size;
         // Récupérer le dernier niveau complété pour cette taille ET difficulté
         const lastCompleted = this.getLastCompletedLevel(size, difficulty);
@@ -2554,6 +2573,7 @@ class HexGridGame {
 
     // Met à jour l'affichage de la progression dans le menu
     updateMenuProgress() {
+        console.log('[DEBUG] updateMenuProgress: selectedDifficulty =', this.selectedDifficulty);
         const sizes = [3, 4, 5, 6, 7, 8, 9];
         // Utiliser la difficulté sélectionnée
         let difficulty = this.selectedDifficulty || 'MEDIUM';
@@ -2561,7 +2581,9 @@ class HexGridGame {
         sizes.forEach(size => {
             const btn = document.querySelector(`[data-action="grid"][data-size="${size}"]`);
             if (btn) {
+                const key = `hexalogic_completed_${size}_${difficulty}`;
                 const lastCompleted = this.getLastCompletedLevel(size, difficulty);
+                console.log(`[DEBUG] updateMenuProgress: key=${key}, lastCompleted=${lastCompleted}`);
                 const nextLevel = lastCompleted + 1;
                 btn.textContent = `Grille d'ordre ${size} (${difficulty}) (Niveau ${nextLevel})`;
                 if (lastCompleted > 0) {
@@ -2584,6 +2606,7 @@ class HexGridGame {
 
     // Enregistre un niveau complété
     saveCompletedLevel(size, level, difficulty='MEDIUM') {
+        console.log('[DEBUG] saveCompletedLevel: selectedDifficulty =', this.selectedDifficulty, 'difficulty =', difficulty);
         const key = `hexalogic_completed_${size}_${difficulty}`;
         const currentMax = this.getLastCompletedLevel(size, difficulty);
         if (level > currentMax) {
@@ -2597,6 +2620,7 @@ class HexGridGame {
     // Vérifie si une grille est complétée et sauvegarde la progression
     checkAndSaveProgress() {
         if (!this.currentGameId) return;
+        if (!this.hasPlayed) return;
         const { size, gameNumber, difficulty } = this.parseGameId(this.currentGameId);
         const constraintCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
         const allConstraintsMet = constraintCells.every(cell => {
@@ -2604,6 +2628,7 @@ class HexGridGame {
             const actual = parseInt(cell.dataset.actual_black || '0');
             return expected === actual;
         });
+        console.log("checkAndSaveProgress " + allConstraintsMet)
         if (allConstraintsMet) {
             const isNewRecord = this.saveCompletedLevel(size, gameNumber, difficulty);
             if (isNewRecord) {
