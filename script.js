@@ -161,7 +161,6 @@ class HexGridGame {
         if (!callback || !callback.toString().includes('resize')) {
             this.moveCount = 0;
             this.moveHistory = [];
-            this.updateMoveCounter();
         }
         
         this.clearGrid();
@@ -273,6 +272,7 @@ class HexGridGame {
             // Appeler setYamlExportVisibility et setControlsVisibility à la toute fin
             if (typeof this.setYamlExportVisibility === 'function') this.setYamlExportVisibility();
             if (typeof this.setControlsVisibility === 'function') this.setControlsVisibility();
+            if (typeof this.setGameUIVisibility === 'function') this.setGameUIVisibility();
         };
         
         // Si un callback est fourni, exécuter immédiatement (pour les tests)
@@ -1261,6 +1261,7 @@ class HexGridGame {
             this.repositionGameControls();
         this.setYamlExportVisibility();
         this.setControlsVisibility();
+        if (typeof this.setGameUIVisibility === 'function') this.setGameUIVisibility();
     }
 
     detectGridSizeFromTextualGrid(textual) {
@@ -1787,7 +1788,6 @@ class HexGridGame {
         // Réinitialiser le compteur de coups
         this.moveCount = 0;
         this.moveHistory = [];
-        this.updateMoveCounter();
         
         // Effacer l'ID_JEU actuel
         this.currentGameId = null;
@@ -1858,7 +1858,6 @@ class HexGridGame {
         this.mode = 'game'; // Forcer le mode GAME ici aussi
         this.moveCount = 0;
         this.moveHistory = [];
-        this.updateMoveCounter();
         const random = this.seededRandom(seed);
         this.generateGrid(() => {
             const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
@@ -2079,7 +2078,6 @@ class HexGridGame {
             prevFill: hex.getAttribute('fill'),
             zoneId: hex.dataset.zoneId
         });
-        this.updateMoveCounter();
     }
 
     // Enregistre un coup de zone dans l'historique
@@ -2098,7 +2096,7 @@ class HexGridGame {
                 zoneId: cell.dataset.zoneId
             }))
         });
-        this.updateMoveCounter();
+
     }
 
     // Annule le dernier coup
@@ -2163,18 +2161,7 @@ class HexGridGame {
         this.updateConstraintTexts();
         this.updateConstraintColors();
         
-        this.updateMoveCounter();
-    }
 
-    // Met à jour l'affichage du compteur de coups
-    updateMoveCounter() {
-        const moveCounter = document.getElementById('moveCounter');
-        if (moveCounter) {
-            moveCounter.textContent = `Coups: ${this.moveCount}`;
-        } else {
-            console.log('moveCounter element not found');
-        }
-        console.log(`Move count updated: ${this.moveCount}`);
     }
 
     // Met à jour l'affichage de l'ID du jeu
@@ -2504,6 +2491,7 @@ class HexGridGame {
         this.updateModeButton();
         this.setYamlExportVisibility();
         this.setControlsVisibility();
+        this.setGameUIVisibility();
         this.closeMenu();
         if (this.mode === 'edit') {
             this.generateGrid();
@@ -2804,6 +2792,7 @@ class HexGridGame {
         this.nbHintEasy = nbHintEasy;
         this.nbHintMedium = nbHintMedium;
         this.nbHintHard = nbHintHard;
+        if (typeof this.updateGameActionRowCounts === 'function') this.updateGameActionRowCounts();
     }
 
     showHintType(type) {
@@ -2954,6 +2943,99 @@ class HexGridGame {
         popup.appendChild(msgDiv);
         popup.style.display = '';
     }
+
+    setGameUIVisibility() {
+        // Affichage conditionnel du header
+        const header = document.querySelector('header');
+        if (header) header.style.display = (this.mode === 'game') ? 'none' : '';
+        // Gestion de la rangée de boutons sous la grille
+        let gameBtns = document.getElementById('gameActionRow');
+        if (!gameBtns) {
+            gameBtns = document.createElement('div');
+            gameBtns.id = 'gameActionRow';
+            gameBtns.style.display = 'flex';
+            gameBtns.style.justifyContent = 'center';
+            gameBtns.style.gap = '18px';
+            gameBtns.style.margin = '18px 0 0 0';
+            // Bouton reset
+            const btnReset = document.createElement('button');
+            btnReset.id = 'btnReset';
+            btnReset.title = 'Réinitialiser la grille';
+            btnReset.innerHTML = '↻';
+            btnReset.className = 'game-btn';
+            btnReset.onclick = () => this.generateGrid();
+            // Bouton Hint Easy
+            const btnHintEasy = document.createElement('button');
+            btnHintEasy.id = 'btnHintEasyRow';
+            btnHintEasy.title = 'Indice facile';
+            btnHintEasy.innerHTML = '💡 <span id="hintEasyCountRow">0</span>';
+            btnHintEasy.className = 'game-btn';
+            btnHintEasy.onclick = () => this.showHintType('easy');
+            // Bouton Hint Medium
+            const btnHintMedium = document.createElement('button');
+            btnHintMedium.id = 'btnHintMediumRow';
+            btnHintMedium.title = 'Indice moyen';
+            btnHintMedium.innerHTML = '💡💡 <span id="hintMediumCountRow">0</span>';
+            btnHintMedium.className = 'game-btn';
+            btnHintMedium.onclick = () => this.showHintType('medium');
+            // Bouton Hint Hard
+            const btnHintHard = document.createElement('button');
+            btnHintHard.id = 'btnHintHardRow';
+            btnHintHard.title = 'Indice difficile';
+            btnHintHard.innerHTML = '💡💡💡 <span id="hintHardCountRow">0</span>';
+            btnHintHard.className = 'game-btn';
+            btnHintHard.onclick = () => this.showHintType('hard');
+            // Bouton retour arrière
+            const btnUndo = document.createElement('button');
+            btnUndo.id = 'btnUndoRow';
+            btnUndo.title = 'Retour arrière';
+            btnUndo.innerHTML = '←';
+            btnUndo.className = 'game-btn';
+            btnUndo.onclick = () => this.undoLastMove();
+            // Ajout des boutons
+            gameBtns.appendChild(btnReset);
+            gameBtns.appendChild(btnHintEasy);
+            gameBtns.appendChild(btnHintMedium);
+            gameBtns.appendChild(btnHintHard);
+            gameBtns.appendChild(btnUndo);
+            // Insérer sous la grille
+            const gridContainer = document.querySelector('.grid-container');
+            if (gridContainer && gridContainer.parentNode) {
+                gridContainer.parentNode.insertBefore(gameBtns, gridContainer.nextSibling);
+            }
+        } else {
+            gameBtns.style.display = 'flex';
+        }
+
+        // Déplacer #gameIdDisplay juste sous la rangée de boutons (toujours)
+        let gameIdDisplay = document.getElementById('gameIdDisplay');
+        if (!gameIdDisplay) {
+            gameIdDisplay = document.createElement('div');
+            gameIdDisplay.id = 'gameIdDisplay';
+            gameIdDisplay.textContent = 'ID: Aucun';
+        }
+        if (gameBtns && gameIdDisplay && gameBtns.nextSibling !== gameIdDisplay) {
+            gameBtns.parentNode.insertBefore(gameIdDisplay, gameBtns.nextSibling);
+            gameIdDisplay.style.display = 'block';
+            gameIdDisplay.style.margin = '8px auto 0 auto';
+            gameIdDisplay.style.textAlign = 'center';
+        }
+        // Mettre à jour les compteurs
+        this.updateGameActionRowCounts && this.updateGameActionRowCounts();
+    }
+
+    updateGameActionRowCounts() {
+        // Met à jour les compteurs sur les boutons de la rangée
+        const easy = this.nbHintEasy || 0;
+        const medium = this.nbHintMedium || 0;
+        const hard = this.nbHintHard || 0;
+        const easySpan = document.getElementById('hintEasyCountRow');
+        if (easySpan) easySpan.textContent = easy;
+        const mediumSpan = document.getElementById('hintMediumCountRow');
+        if (mediumSpan) mediumSpan.textContent = medium;
+        const hardSpan = document.getElementById('hintHardCountRow');
+        if (hardSpan) hardSpan.textContent = hard;
+    }
 }
 
 // Initialiser le jeu quand la page est chargée
@@ -2991,36 +3073,7 @@ window.addEventListener('load', () => {
         gameControls.style.width = '100%';
         gameControls.style.clear = 'both';
         
-        // Ajout de l'ID du jeu actuel
-        const gameIdDisplay = document.createElement('div');
-        gameIdDisplay.id = 'gameIdDisplay';
-        gameIdDisplay.textContent = 'ID: Aucun';
-        gameIdDisplay.style.margin = '8px';
-        gameIdDisplay.style.fontSize = '14px';
-        gameIdDisplay.style.color = '#666';
-        gameIdDisplay.style.display = 'inline-block';
-        
-        // Ajout du compteur de coups
-        const moveCounter = document.createElement('div');
-        moveCounter.id = 'moveCounter';
-        moveCounter.textContent = 'Coups: 0';
-        moveCounter.style.margin = '8px';
-        moveCounter.style.fontWeight = 'bold';
-        moveCounter.style.fontSize = '16px';
-        moveCounter.style.display = 'inline-block';
-        
-        // Ajout du bouton retour arrière
-        const undoBtn = document.createElement('button');
-        undoBtn.id = 'undoBtn';
-        undoBtn.textContent = '← Retour arrière';
-        undoBtn.style.margin = '8px';
-        undoBtn.onclick = () => game.undoLastMove();
-        
-        // Ajouter les éléments au conteneur
-        gameControls.appendChild(gameIdDisplay);
-        gameControls.appendChild(moveCounter);
-        gameControls.appendChild(undoBtn);
-        
+
         // Insérer le conteneur après le grid-container
         const gridContainer = document.querySelector('.grid-container');
         if (gridContainer) {
@@ -3030,7 +3083,20 @@ window.addEventListener('load', () => {
             // Fallback : insérer à la fin du body
             document.body.appendChild(gameControls);
         }
-    }
-    // Forcer la visibilité correcte du YAML après tout
-    //game.setYamlExportVisibility();
+
+
+        // Ajout de l'ID du jeu actuel
+        const gameIdDisplay = document.createElement('div');
+        gameIdDisplay.id = 'gameIdDisplay';
+        gameIdDisplay.textContent = 'ID: Aucun';
+        gameIdDisplay.style.margin = '8px';
+        gameIdDisplay.style.fontSize = '14px';
+        gameIdDisplay.style.color = '#666';
+        gameIdDisplay.style.display = 'inline-block';
+        
+        
+        this.setGameUIVisibility();
+
+
+    }    
 }); 
