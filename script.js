@@ -3007,21 +3007,21 @@ class HexGridGame {
             const btnHintEasy = document.createElement('button');
             btnHintEasy.id = 'btnHintEasyRow';
             btnHintEasy.title = 'Indice facile';
-            btnHintEasy.innerHTML = '💡 <span id="hintEasyCountRow">0</span>';
+            btnHintEasy.innerHTML = '🥉 <span id="hintEasyCountRow">0</span>';
             btnHintEasy.className = 'game-btn';
             btnHintEasy.onclick = () => this.showHintType('easy');
             // Bouton Hint Medium
             const btnHintMedium = document.createElement('button');
             btnHintMedium.id = 'btnHintMediumRow';
             btnHintMedium.title = 'Indice moyen';
-            btnHintMedium.innerHTML = '💡💡 <span id="hintMediumCountRow">0</span>';
+            btnHintMedium.innerHTML = '🥈 <span id="hintMediumCountRow">0</span>';
             btnHintMedium.className = 'game-btn';
             btnHintMedium.onclick = () => this.showHintType('medium');
             // Bouton Hint Hard
             const btnHintHard = document.createElement('button');
             btnHintHard.id = 'btnHintHardRow';
             btnHintHard.title = 'Indice difficile';
-            btnHintHard.innerHTML = '💡💡💡 <span id="hintHardCountRow">0</span>';
+            btnHintHard.innerHTML = '🥇 <span id="hintHardCountRow">0</span>';
             btnHintHard.className = 'game-btn';
             btnHintHard.onclick = () => this.showHintType('hard');
             // Bouton retour arrière
