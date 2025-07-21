@@ -2629,7 +2629,6 @@ class HexGridGame {
     // Vérifie si une grille est complétée et sauvegarde la progression
     checkAndSaveProgress() {
         if (!this.currentGameId) return;
-        if (!this.hasPlayed) return;
         if (!this.victoryAllowed) return;
         // Mettre à jour les contraintes avant de vérifier la victoire
         this.updateAllActualBlack();
