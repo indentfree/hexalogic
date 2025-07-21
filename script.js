@@ -147,6 +147,10 @@ class HexGridGame {
             this.updateConstraintTexts();
             this.updateConstraintColors();
             
+            //mise à jours des hint
+            this.updateAllActualBlack();
+            this.setGameUIVisibility()
+
             // Ne pas redémarrer l'animation automatiquement lors du resize
             // this.startZoneColorAnimation();
         });
@@ -155,8 +159,6 @@ class HexGridGame {
     generateGrid(callback = null) {
         this.hasPlayed = false;
         this.victoryAllowed = false;
-        console.log('[DEBUG] generateGrid: selectedDifficulty =', this.selectedDifficulty);
-        this.victoryShown = false;
         // Cacher le message de victoire à chaque régénération
         const msgDiv = document.getElementById('victoryMsg');
         if (msgDiv) msgDiv.style.display = 'none';
@@ -1468,7 +1470,6 @@ class HexGridGame {
 
         if (!this.victoryAllowed) { return }
         let msgDiv = document.getElementById('victoryMsg');
-        console.log('showVictoryMessage appelé avec allOk =', allOk);
         if (!msgDiv) {
             msgDiv = document.createElement('div');
             msgDiv.id = 'victoryMsg';
@@ -2088,7 +2089,6 @@ class HexGridGame {
 
     // Enregistre un coup dans l'historique
     recordMove(hex, prevState, newState) {
-        console.log(`Recording move: ${prevState} -> ${newState}`);
         this.moveCount++;
         this.moveHistory.push({
             type: 'single',
@@ -2104,7 +2104,6 @@ class HexGridGame {
 
     // Enregistre un coup de zone dans l'historique
     recordZoneMove(zoneCells, prevState, newState) {
-        console.log(`Recording zone move: ${prevState} -> ${newState} for ${zoneCells.length} cells`);
         this.moveCount++;
         this.moveHistory.push({
             type: 'zone',
@@ -2123,9 +2122,7 @@ class HexGridGame {
 
     // Annule le dernier coup
     undoLastMove() {
-        console.log(`Undo called. History length: ${this.moveHistory.length}`);
         if (this.moveHistory.length === 0) {
-            console.log('No moves to undo');
             return;
         }
         
@@ -2133,7 +2130,6 @@ class HexGridGame {
         this.moveCount--;
         
         if (lastMove.type === 'zone') {
-            console.log(`Undoing zone move: ${lastMove.cells.length} cells`);
             // Restaurer toutes les cellules de la zone
             lastMove.cells.forEach(cellData => {
                 const hex = cellData.hex;
@@ -2156,7 +2152,6 @@ class HexGridGame {
                 }
             });
         } else {
-            console.log(`Undoing single move: ${lastMove.newState} -> ${lastMove.prevState}`);
             // Restaurer une seule cellule
             const hex = lastMove.hex;
             hex.dataset.state = lastMove.prevState;
@@ -2266,10 +2261,16 @@ class HexGridGame {
     generateGridFromGameId(gameId) {
         this.hasPlayed = false;
         this.victoryAllowed = false;
-        console.log('[DEBUG] generateGridFromGameId: selectedDifficulty =', this.selectedDifficulty);
         this.victoryShown = false;
+        // Synchroniser la difficulté du menu avec celle du gameId
         try {
             const { size, gameNumber, difficulty } = this.parseGameId(gameId);
+            const diffSelector = document.getElementById('difficultySelector');
+            if (diffSelector && diffSelector.value !== difficulty) {
+                diffSelector.value = difficulty;
+                this.selectedDifficulty = difficulty;
+                this.updateMenuProgress();
+            }
             const seed = this.generateSeedFromGameNumber(gameId);
             this.currentGameId = gameId;
             this.currentSeed = seed;
@@ -2291,7 +2292,6 @@ class HexGridGame {
             console.log('Ready to play')
             this.victoryAllowed = true;
         } catch (error) {
-            console.error('Erreur lors de la génération de la grille:', error.message);
             // Fallback vers une grille aléatoire
             this.generateRandomPuzzle();
         }
@@ -2582,7 +2582,6 @@ class HexGridGame {
 
     // Met à jour l'affichage de la progression dans le menu
     updateMenuProgress() {
-        console.log('[DEBUG] updateMenuProgress: selectedDifficulty =', this.selectedDifficulty);
         const sizes = [3, 4, 5, 6, 7, 8, 9];
         // Utiliser la difficulté sélectionnée
         let difficulty = this.selectedDifficulty || 'MEDIUM';
@@ -2592,7 +2591,6 @@ class HexGridGame {
             if (btn) {
                 const key = `hexalogic_completed_${size}_${difficulty}`;
                 const lastCompleted = this.getLastCompletedLevel(size, difficulty);
-                console.log(`[DEBUG] updateMenuProgress: key=${key}, lastCompleted=${lastCompleted}`);
                 const nextLevel = lastCompleted + 1;
                 btn.textContent = `Grille d'ordre ${size} (${difficulty}) (Niveau ${nextLevel})`;
                 if (lastCompleted > 0) {
@@ -2615,7 +2613,6 @@ class HexGridGame {
 
     // Enregistre un niveau complété
     saveCompletedLevel(size, level, difficulty='MEDIUM') {
-        console.log('[DEBUG] saveCompletedLevel: selectedDifficulty =', this.selectedDifficulty, 'difficulty =', difficulty);
         const key = `hexalogic_completed_${size}_${difficulty}`;
         const currentMax = this.getLastCompletedLevel(size, difficulty);
         if (level > currentMax) {
@@ -2742,7 +2739,6 @@ class HexGridGame {
     }
 
     updateHintBtn() {
-    console.log("updateHintBtn");
         const hintBtn = document.getElementById('hintBtn');
         //if (!hintBtn) return;
         const constraints = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
@@ -2762,7 +2758,6 @@ class HexGridGame {
                 ((actualWhite === (cellCount - expectedBlack)) || (actualBlack === expectedBlack)) &&
                 (actualWhite + actualBlack < cellCount)
             ) {
-             console.log("hintEasy");
                 nbHintEasy++;
                 this.hintEasyList.push(constraint);
                 return; // Ne pas évaluer Hard/Medium si Easy trouvé
@@ -2806,14 +2801,12 @@ class HexGridGame {
                     const zs = maxZones[0];
                     // Règle 1 : zone doit être blanche
                     if (zs.count + actualBlack > expectedBlack) {
-                    console.log("hintMedium");
                         nbHintMedium++;
                         this.hintMediumList.push({constraint, zs, type: 'white'});
                         return;
                     }
                     // Règle 2 : zone doit être noire
                     if (zs.count + actualWhite > (cellCount - expectedBlack)) {
-                    console.log("hintMedium");
                         nbHintMedium++;
                         this.hintMediumList.push({constraint, zs, type: 'black'});
                         return;
