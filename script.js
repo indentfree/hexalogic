@@ -3002,7 +3002,13 @@ class HexGridGame {
             btnReset.title = 'Réinitialiser la grille';
             btnReset.innerHTML = '↻';
             btnReset.className = 'game-btn';
-            btnReset.onclick = () => this.generateGrid();
+            btnReset.onclick = () => {
+                if (this.currentGameId) {
+                    this.generateGridFromGameId(this.currentGameId);
+                } else {
+                    this.generateGrid();
+                }
+            };
             // Bouton Hint Easy
             const btnHintEasy = document.createElement('button');
             btnHintEasy.id = 'btnHintEasyRow';
