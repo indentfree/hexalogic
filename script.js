@@ -2270,7 +2270,7 @@ class HexGridGame {
         this.victoryShown = false;
         try {
             const { size, gameNumber, difficulty } = this.parseGameId(gameId);
-            const seed = this.generateSeedFromGameNumber(gameNumber);
+            const seed = this.generateSeedFromGameNumber(gameId);
             this.currentGameId = gameId;
             this.currentSeed = seed;
             this.gridSize = size;
