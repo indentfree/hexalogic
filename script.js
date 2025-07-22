@@ -534,6 +534,7 @@ class HexGridGame {
                 this.updateYamlExport && this.updateYamlExport();
             } else {
                 // Comportement normal (zones, cycle 3 états)
+                this.victoryAllowed=true;
                 const zoneId = hex.dataset.zoneId;
                 if (zoneId) {
                     // ... gestion zone ...
