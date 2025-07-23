@@ -2,6 +2,45 @@
 
 window.GRIDS_DEFINITION = [
   {
+    name: "SMILE",
+
+    textual_grid: `
+        1 0 0 0 0 0 1
+       0 1 0 0 0 0 1 0
+      0 0 1 1 1 1 1 0 0
+     0 0 1 0 0 0 0 1 0 0
+    0 0 1 0 1 0 1 0 1 0 0
+   0 0 1 0 0 0 0 0 0 1 0 0
+  0 0 1 0 0 0 1 0 0 0 1 0 0
+   0 0 1 0 1 0 0 1 0 1 0 0
+    0 0 1 0 1 1 1 0 1 0 0
+     0 0 1 0 0 0 0 1 0 0
+      0 0 1 1 1 1 1 0 0
+       0 0 0 1 1 0 0 0
+        0 0 1 1 1 0 0
+    `,
+    textual_zones : `
+        A a a b c c U
+       d A a a c c U L
+      Y d A A O O N L L
+     B e à x x y y M # #
+    e e à x P y Q y _ @ @
+   Z e C w v v v u u K @ ~
+  f f C w w w R u u u K q q
+   f g C s I w u J u H q r
+    g g C s I I J t H q r
+     g h X s t t t H p p
+      i j X X E F G p p
+       k k W S S V o o
+        k l S S T m n
+    `,
+    constraints: {
+      K: [1, 1, 5, 2, 3, 3, 7, 3, 6, 4, 6, 0, 0],
+      I: [1, 1, 5, 2, 3, 3, 7, 3, 6, 4, 6, 0, 0],
+      J: [3, 2, 5, 2, 5, 4, 3, 2, 4, 2, 5, 2, 2]
+    }
+  },
+  {
     name: "Grille 6x6 test",
 
     textual_grid: `
