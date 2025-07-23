@@ -1,7 +1,7 @@
 class HexGridGame {
     constructor(gridSize = null) {
         this.initializeElements();
-        
+
         // Utiliser le paramètre gridSize s'il est fourni, sinon utiliser les valeurs par défaut
         if (gridSize !== null) {
             this.gridSize = gridSize;
@@ -10,20 +10,20 @@ class HexGridGame {
         } else {
             this.gridSize = 4; // Valeur par défaut
         }
-        
+
         this.selectedHexes = new Set();
         this.score = 0;
         this.grid = [];
         this.mode = 'game'; // Forcer le mode par défaut à GAME
-        
+
         // Système de suivi des coups
         this.moveCount = 0;
         this.moveHistory = [];
-        
+
         // Système de graines déterministes
         this.currentSeed = null;
         this.currentGameId = null;
-        
+
         this.bindEvents();
         // NE PAS générer la grille ici, attendre window.onload
         this.bindModeToggle();
@@ -41,7 +41,7 @@ class HexGridGame {
             this.debugMode = true;
         }
     }
-    
+
     initializeElements() {
         this.hexGridSvg = document.getElementById('hexGridSvg');
         if (!this.hexGridSvg) {
@@ -58,7 +58,7 @@ class HexGridGame {
         this.gridSizeInput = document.getElementById('gridSize');
         this.controlsDiv = document.querySelector('.controls');
     }
-    
+
     bindEvents() {
         // Événements pour les boutons (seulement si les éléments existent)
         if (this.newGameBtn) {
@@ -67,7 +67,7 @@ class HexGridGame {
         if (this.clearBtn) {
             this.clearBtn.addEventListener('click', () => this.clearGrid());
         }
-        
+
         // Événements pour les contrôles de taille (seulement si les éléments existent)
         if (this.gridSizeInput) {
             this.gridSizeInput.addEventListener('change', () => {
@@ -75,20 +75,20 @@ class HexGridGame {
                 this.generateGrid();
             });
         }
-        
+
         // Responsive : régénérer la grille à chaque resize
         window.addEventListener('resize', () => this.resizeGrid());
-        
+
         // Gestion du menu hamburger
         this.bindHamburgerMenu();
     }
-    
+
     // Redimensionnement de la grille en préservant l'état des cellules
     resizeGrid() {
         // Sauvegarder l'état actuel des cellules de jeu
         const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
         const gameCellStates = new Map();
-        
+
         gameCells.forEach(cell => {
             const key = `${cell.dataset.row},${cell.dataset.col}`;
             gameCellStates.set(key, {
@@ -97,11 +97,11 @@ class HexGridGame {
                 fill: cell.getAttribute('fill')
             });
         });
-        
+
         // Sauvegarder l'état actuel des cellules de contraintes
         const constraintCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
         const constraintStates = new Map();
-        
+
         constraintCells.forEach(cell => {
             const key = `${cell.dataset.row},${cell.dataset.col}`;
             constraintStates.set(key, {
@@ -110,10 +110,10 @@ class HexGridGame {
                 constraint_id: cell.dataset.constraint_id
             });
         });
-        
+
         // Sauvegarder les données des zones isolées
         const isolatedZones = { ...this.isolatedZoneColors };
-        
+
         // Régénérer la grille
         this.generateGrid(() => {
             // Restaurer l'état des cellules de jeu
@@ -127,7 +127,7 @@ class HexGridGame {
                     cell.setAttribute('fill', savedState.fill);
                 }
             });
-            
+
             // Restaurer l'état des cellules de contraintes
             const newConstraintCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
             newConstraintCells.forEach(cell => {
@@ -139,14 +139,14 @@ class HexGridGame {
                     cell.dataset.constraint_id = savedState.constraint_id;
                 }
             });
-            
+
             // Restaurer les zones isolées
             this.isolatedZoneColors = isolatedZones;
-            
+
             // Mettre à jour l'affichage des contraintes
             this.updateConstraintTexts();
             this.updateConstraintColors();
-            
+
             //mise à jours des hint
             this.updateAllActualBlack();
             this.setGameUIVisibility()
@@ -162,20 +162,20 @@ class HexGridGame {
         // Cacher le message de victoire à chaque régénération
         const msgDiv = document.getElementById('victoryMsg');
         if (msgDiv) msgDiv.style.display = 'none';
-        
+
         // Réinitialiser le compteur de coups si c'est une nouvelle grille (pas un resize)
         if (!callback || !callback.toString().includes('resize')) {
             this.moveCount = 0;
             this.moveHistory = [];
         }
-        
+
         this.clearGrid();
         const svg = this.hexGridSvg;
         svg.innerHTML = '';
         // Synchroniser la largeur du SVG avec celle de son parent
         svg.style.width = '100%';
         svg.style.height = 'auto';
-        
+
         // Fonction pour générer la grille (synchrone)
         const generateGridContent = () => {
             // Obtenir la largeur du SVG (avec fallback pour les tests)
@@ -184,7 +184,7 @@ class HexGridGame {
                 // Pour les tests ou si le layout n'est pas encore prêt
                 svgWidth = 600; // Valeur par défaut
             }
-            
+
             const N = this.gridSize;
             this.isGridEven = (N % 2 === 0); // Mettre à jour isGridEven à chaque changement de taille
             const maxHexes = 2 * N - 1 + 2;
@@ -202,7 +202,7 @@ class HexGridGame {
             svg.setAttribute('height', (totalRows - 1) * w * 0.866 + w);
             this.grid = [];
             let hexNumber = 1;
-            
+
             // Créer tous les hexagones
             const hexCells = [];
             for (let row = 0; row < totalRows; row++) {
@@ -262,7 +262,7 @@ class HexGridGame {
                     svg.appendChild(hex);
                 }
             }
-            
+
             // Propagation IJK récursive depuis la cellule centrale
             this.affecterEtVerifierIJKRecursif(this.gridSize, this.gridSize, 0, 0, 0);
             this.assignConstraintIds();
@@ -270,7 +270,7 @@ class HexGridGame {
             this.updateDisplay();
             this.updateYamlExport();
             this.updateZoneBorders();
-            
+
             // Appeler le callback si fourni
             if (callback) {
                 callback();
@@ -280,7 +280,7 @@ class HexGridGame {
             if (typeof this.setControlsVisibility === 'function') this.setControlsVisibility();
             if (typeof this.setGameUIVisibility === 'function') this.setGameUIVisibility();
         };
-        
+
         // Si un callback est fourni, exécuter immédiatement (pour les tests)
         if (callback) {
             generateGridContent();
@@ -289,9 +289,9 @@ class HexGridGame {
             setTimeout(generateGridContent, 0);
         }
     }
-    
 
-    
+
+
     createHexPolygon(cx, cy, r) {
         let points = [];
         for (let i = 0; i < 6; i++) {
@@ -302,13 +302,13 @@ class HexGridGame {
         }
         return points.join(' ');
     }
-    
+
     cycleHexState(hex) {
         let state = parseInt(hex.dataset.state);
         const prevState = state;
         state = (state + 1) % 3;
         hex.dataset.state = state;
-        
+
         // Enregistrer le coup dans l'historique
         this.recordMove(hex, prevState, state);
         if (state === 0) {
@@ -404,18 +404,18 @@ class HexGridGame {
         }
         if (typeof this.updateHintBtn === 'function') this.updateHintBtn();
     }
-    
+
     updateDisplay() {
         // Suppression : plus de selectedCountSpan ni scoreSpan à mettre à jour
     }
-    
+
     clearGrid() {
         this.hexGridSvg.innerHTML = '';
         this.selectedHexes.clear();
         this.grid = [];
         this.updateDisplay();
     }
-    
+
     // Déterminer si une cellule est sur le bord de la grille étendue
     isBorderCell(row, col, N, totalRows) {
         const hexesInRow = N + Math.min(row, totalRows - 1 - row);
@@ -425,30 +425,30 @@ class HexGridGame {
         // - Première ou dernière colonne de sa ligne
         return row === 0 || row === totalRows - 1 || col === 0 || col === hexesInRow - 1;
     }
-    
+
     // Déterminer si une cellule de bordure est inutile pour les contraintes
     isUselessConstraintCell(row, col, N, totalRows) {
         const hexesInRow = N + Math.min(row, totalRows - 1 - row);
         const centerRow = Math.floor(totalRows / 2);
-        
+
         // 1. Première cellule à gauche sur la première ligne
         if (row === 0 && col === 0) {
             return true;
         }
-        
+
         // 2. Première cellule à gauche sur la dernière ligne
         if (row === totalRows - 1 && col === 0) {
             return true;
         }
-        
+
         // 3. Dernière cellule à droite sur la ligne centrale
         if (row === centerRow && col === hexesInRow - 1) {
             return true;
         }
-        
+
         return false;
     }
-    
+
     // Méthode simplifiée pour ajouter les textes et événements
     addSimpleTextsAndEvents(hexCells) {
         hexCells.forEach(hex => {
@@ -511,7 +511,7 @@ class HexGridGame {
             }
         });
     }
-    
+
     // Méthode simplifiée pour ajouter les événements à une cellule
     addSimpleCellEvents(hex) {
         hex.addEventListener('click', () => {
@@ -606,7 +606,7 @@ class HexGridGame {
             this.clearNeighborHighlight();
         });
     }
-    
+
     // Méthode simplifiée pour afficher le tooltip
     showSimpleTooltip(e, hex) {
         if (this.mode === 'game') return; // Pas de tooltip en mode GAME
@@ -682,11 +682,11 @@ class HexGridGame {
         `;
         tooltip.innerHTML = html;
     }
-    
+
     hideTooltip() {
         this.hexTooltip.style.display = 'none';
     }
-    
+
     // Calculer les voisins d'une cellule basée sur ses coordonnées (row,col)
     getNeighborsByCoords(row, col) {
         // Directions pour odd-r offset (ordre : haut-gauche, haut-droite, droite, bas-droite, bas-gauche, gauche)
@@ -715,22 +715,22 @@ class HexGridGame {
         }
         return directions.map(([dr, dc]) => [row + dr, col + dc]);
     }
-    
+
     // Trouver les IDs des voisins d'une cellule par ses coordonnées
     getNeighborIdsByCoords(row, col) {
         const neighborCoords = this.getNeighborsByCoords(row, col);
         const neighborIds = [];
-        
+
         for (const [nRow, nCol] of neighborCoords) {
             const neighborCell = this.findCellByCoords(nRow, nCol);
             if (neighborCell && neighborCell.dataset.type === 'game') {
                 neighborIds.push(parseInt(neighborCell.dataset.hexNumber));
             }
         }
-        
+
         return neighborIds;
     }
-    
+
     // Trouver une cellule par ses coordonnées
     findCellByCoords(row, col) {
         const cells = this.hexGridSvg.querySelectorAll('polygon');
@@ -741,19 +741,19 @@ class HexGridGame {
         }
         return null;
     }
-    
+
     // Trouver les voisins d'une cellule par son ID
     getNeighborIdsById(cellId) {
         const cell = this.findCellById(cellId);
         if (!cell) {
             return [];
         }
-        
+
         const row = parseInt(cell.dataset.row);
         const col = parseInt(cell.dataset.col);
         return this.getNeighborIdsByCoords(row, col);
     }
-    
+
     // Trouver une cellule par son ID
     findCellById(cellId) {
         const cells = this.hexGridSvg.querySelectorAll('polygon[data-type="game"]');
@@ -764,21 +764,21 @@ class HexGridGame {
         }
         return null;
     }
-    
+
     // Mettre en évidence les voisins d'une cellule
     highlightNeighbors(hex) {
         // Effacer toute mise en évidence précédente
         this.clearNeighborHighlight();
-        
+
         // Mettre en évidence la cellule survolée
         hex.setAttribute('stroke', '#ff6b35');
         hex.setAttribute('stroke-width', '3');
-        
+
         // Trouver les voisins
         const row = parseInt(hex.dataset.row);
         const col = parseInt(hex.dataset.col);
         const neighborIds = this.getNeighborIdsByCoords(row, col);
-        
+
         // Mettre en évidence chaque voisin
         for (const neighborId of neighborIds) {
             const neighborCell = this.findCellById(neighborId);
@@ -787,7 +787,7 @@ class HexGridGame {
                 neighborCell.setAttribute('stroke-width', '2');
             }
         }
-        
+
         // Stocker les références pour pouvoir les effacer plus tard
         this.highlightedCells = [hex];
         for (const neighborId of neighborIds) {
@@ -797,7 +797,7 @@ class HexGridGame {
             }
         }
     }
-    
+
     // Effacer la mise en évidence des voisins
     clearNeighborHighlight() {
         if (this.highlightedCells) {
@@ -825,12 +825,12 @@ class HexGridGame {
             this.highlightedCells = null;
         }
     }
-    
+
     // Affecte récursivement les coordonnées IJK à toute la grille
     affecterEtVerifierIJKRecursif(row, col, i, j, k) {
         const cell = this.findCellByCoords(row, col);
         if (!cell) return;
-        
+
         // Si la cellule n'a pas encore de coordonnées, on les affecte
         if (cell.dataset.i === undefined || cell.dataset.j === undefined || cell.dataset.k === undefined) {
             cell.dataset.i = i;
@@ -840,7 +840,7 @@ class HexGridGame {
             // Si déjà affecté, on ne propage pas plus loin
             return;
         }
-        
+
         // Propager aux voisins
         const voisins = this.getNeighborsByCoords(row, col);
         for (let d = 0; d < voisins.length; d++) {
@@ -863,7 +863,7 @@ class HexGridGame {
             this.affecterEtVerifierIJKRecursif(nrow, ncol, ni, nj, nk);
         }
     }
-    
+
     // Assigne les IDs de contrainte (K, I, J) aux cellules de contrainte du bord
     assignConstraintIds() {
         const crownCells = this.listCrownCells();
@@ -915,12 +915,12 @@ class HexGridGame {
         const totalRows = 2 * extendedN - 1;
 
         // Trouver toutes les cellules de la couronne (constraint + useless)
-        const crownCells = cells.filter(cell => 
+        const crownCells = cells.filter(cell =>
             cell.dataset.type === 'constraint' || cell.dataset.type === 'useless'
         );
 
         // Trouver la première cellule USELESS (la plus à gauche de la première ligne)
-        const startCell = crownCells.find(cell => 
+        const startCell = crownCells.find(cell =>
             cell.dataset.type === 'useless' && parseInt(cell.dataset.row) === 0
         );
         if (!startCell) return [];
@@ -944,7 +944,7 @@ class HexGridGame {
             // Trouver le prochain voisin de la couronne non visité
             const neighbors = this.getNeighborsByCoords(row, col);
             const neighborCells = neighbors.map(([nrow, ncol]) => this.findCellByCoords(nrow, ncol));
-            const crownNeighbors = neighborCells.filter(cell => 
+            const crownNeighbors = neighborCells.filter(cell =>
                 cell && (cell.dataset.type === 'constraint' || cell.dataset.type === 'useless') && !visited.has(cell)
             );
             current = crownNeighbors[0] || null;
@@ -972,12 +972,12 @@ class HexGridGame {
         const totalRows = 2 * extendedN - 1;
 
         // Trouver toutes les cellules de la couronne (constraint + useless)
-        const crownCells = cells.filter(cell => 
+        const crownCells = cells.filter(cell =>
             cell.dataset.type === 'constraint' || cell.dataset.type === 'useless'
         );
 
         // Trouver la première cellule USELESS (la plus à gauche de la première ligne)
-        const startCell = crownCells.find(cell => 
+        const startCell = crownCells.find(cell =>
             cell.dataset.type === 'useless' && parseInt(cell.dataset.row) === 0
         );
         if (!startCell) return [];
@@ -1001,7 +1001,7 @@ class HexGridGame {
             // Trouver le prochain voisin de la couronne non visité
             const neighbors = this.getNeighborsByCoords(row, col);
             const neighborCells = neighbors.map(([nrow, ncol]) => this.findCellByCoords(nrow, ncol));
-            const crownNeighbors = neighborCells.filter(cell => 
+            const crownNeighbors = neighborCells.filter(cell =>
                 cell && (cell.dataset.type === 'constraint' || cell.dataset.type === 'useless') && !visited.has(cell)
             );
             current = crownNeighbors[0] || null;
@@ -1071,9 +1071,6 @@ class HexGridGame {
                         selector.style.display = '';
                         this.populateGridSelector();
                     }
-                    if (window.GRIDS_DEFINITION && window.GRIDS_DEFINITION.length > 0) {
-                        this.loadGridFromConf(window.GRIDS_DEFINITION[0]);
-                    }
                 } else {
                     if (selector) selector.style.display = 'none';
                     this.generateGrid();
@@ -1113,14 +1110,14 @@ class HexGridGame {
             selector.appendChild(opt);
         });
         selector.selectedIndex = 0;
-        // Charger la première grille par défaut
-        this.loadGridFromConf(window.GRIDS_DEFINITION[0]);
     }
 
     loadGridFromConf(conf) {
         this.hasPlayed = false;
         this.victoryAllowed = false;
         this.mode = 'game'; // Forcer le mode GAME lors du chargement d'une grille prédéfinie
+        this.updateUrlWithGameId(conf.name);
+
         // Générer la grille à partir de textual_grid et constraints
         if (conf.textual_grid) {
             this.generateGridFromTextualGrid(conf.textual_grid, conf.constraints, conf.textual_zones);
@@ -1140,6 +1137,7 @@ class HexGridGame {
                 if (conf.constraints) {
                     this.initConstraintsFromConf(conf.constraints);
                 }
+
                 this.updateAllActualBlack();
                 this.updateConstraintColors();
             }
@@ -1254,7 +1252,7 @@ class HexGridGame {
                 cell.setAttribute('fill', '#b2bec3');
             }
         }
-        
+
         this.addSimpleTextsAndEvents(hexCells);
         this.updateDisplay();
         this.affecterEtVerifierIJKRecursif(this.gridSize, this.gridSize, 0, 0, 0);
@@ -1272,7 +1270,7 @@ class HexGridGame {
             this.updateYamlExport();
             // Animation désactivée par défaut
             // this.startZoneColorAnimation();
-            
+
             // S'assurer que les contrôles de jeu sont bien positionnés
             this.repositionGameControls();
         this.setYamlExportVisibility();
@@ -1295,7 +1293,7 @@ class HexGridGame {
 
         let allExpectedTmp = [[0], constraints.K, [0], constraints.I, [0], constraints.J];
         let allExpected = allExpectedTmp.flat();
-        
+
         // Affectation réelle
         crownCells.forEach((cell, idx) => {
             const svgCell = this.findCellByCoords(cell.row, cell.col);
@@ -1806,18 +1804,18 @@ class HexGridGame {
         // 0. Choisir N aléatoirement entre 3 et 10 et régénérer la grille
         const N = Math.floor(Math.random() * 8) + 3; // 3 à 10 inclus
         this.gridSize = N;
-        
+
         // Réinitialiser le compteur de coups
         this.moveCount = 0;
         this.moveHistory = [];
-        
+
         // Effacer l'ID_JEU actuel
         this.currentGameId = null;
         this.currentSeed = null;
-        
+
         // Mettre à jour l'affichage de l'ID
         this.updateGameIdDisplay();
-        
+
         this.generateGrid(() => {
             // 1. Mettre toutes les cellules de jeu à un état aléatoire (NOIR ou BLANC)
             const gameCells = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="game"]'));
@@ -1868,7 +1866,7 @@ class HexGridGame {
             //this.updateConstraintColors();
             // Animation désactivée par défaut
             // this.startZoneColorAnimation();
-            
+
             // S'assurer que les contrôles de jeu sont bien positionnés
             this.repositionGameControls();
         });
@@ -2033,7 +2031,7 @@ class HexGridGame {
                 // Teinte cyclique selon le temps et le zoneId
                 // Pour chaque zone, un déphasage pour éviter que toutes les zones changent en même temps
                 const base = parseInt(zoneId.replace(/[^0-9A-Z]/g, ''), 36) || 0;
-                
+
                 // Extraire la teinte initiale de la couleur de la zone
                 let initialHue = 0;
                 if (zoneId.startsWith('ISO')) {
@@ -2051,7 +2049,7 @@ class HexGridGame {
                         initialHue = match ? parseInt(match[1]) : 0;
                     }
                 }
-                
+
                 const direction = base % 2 === 0 ? 1 : -1; // Sens alterné selon le zoneId
                 const t = ((now / 100 * direction) + initialHue) % 360;
                 // Style stable par zone - uniquement pastel
@@ -2126,16 +2124,16 @@ class HexGridGame {
         if (this.moveHistory.length === 0) {
             return;
         }
-        
+
         const lastMove = this.moveHistory.pop();
         this.moveCount--;
-        
+
         if (lastMove.type === 'zone') {
             // Restaurer toutes les cellules de la zone
             lastMove.cells.forEach(cellData => {
                 const hex = cellData.hex;
                 hex.dataset.state = cellData.prevState;
-                
+
                 // Restaurer l'apparence selon l'état
                 if (cellData.prevState === 0) {
                     // État gris - restaurer la couleur de zone
@@ -2156,7 +2154,7 @@ class HexGridGame {
             // Restaurer une seule cellule
             const hex = lastMove.hex;
             hex.dataset.state = lastMove.prevState;
-            
+
             // Restaurer l'apparence selon l'état
             if (lastMove.prevState === 0) {
                 // État gris - restaurer la couleur de zone
@@ -2173,12 +2171,12 @@ class HexGridGame {
                 hex.setAttribute('fill', '#fff'); // blanc
             }
         }
-        
+
         // Mettre à jour les contraintes
         this.updateAllActualBlack();
         this.updateConstraintTexts();
         this.updateConstraintColors();
-        
+
 
     }
 
@@ -2194,7 +2192,7 @@ class HexGridGame {
                 gameIdDisplay.style.color = '#666';
             }
         }
-        
+
         // Mettre à jour le titre
         this.updatePageTitle();
     }
@@ -2215,7 +2213,7 @@ class HexGridGame {
     repositionGameControls() {
         const gameControls = document.getElementById('gameControls');
         const gridContainer = document.querySelector('.grid-container');
-        
+
         if (gameControls && gridContainer) {
             // Retirer le conteneur de son emplacement actuel
             if (gameControls.parentNode) {
@@ -2264,38 +2262,33 @@ class HexGridGame {
         this.victoryAllowed = false;
         this.victoryShown = false;
         // Synchroniser la difficulté du menu avec celle du gameId
-        try {
-            const { size, gameNumber, difficulty } = this.parseGameId(gameId);
-            const diffSelector = document.getElementById('difficultySelector');
-            if (diffSelector && diffSelector.value !== difficulty) {
-                diffSelector.value = difficulty;
-                this.selectedDifficulty = difficulty;
-                this.updateMenuProgress();
-            }
-            const seed = this.generateSeedFromGameNumber(gameId);
-            this.currentGameId = gameId;
-            this.currentSeed = seed;
-            this.gridSize = size;
-            this.currentDifficulty = difficulty;
-            this.mode = 'game'; // Forcer le mode GAME lors du chargement par ID
-            // Pour createZonesForCurrentStates
-            let diffVal = 0;
-            if (difficulty === 'EASY') diffVal = 1;
-            else if (difficulty === 'HARD') diffVal = -1;
-            else if (difficulty === 'HARDER') diffVal = -2;
-            // Mettre à jour l'URL
-            this.updateUrlWithGameId(gameId);
-            // Mettre à jour l'affichage de l'ID
-            this.updateGameIdDisplay();
-            // Générer la grille avec la graine et la difficulté
-            this.generateSeededPuzzle(seed, diffVal);
-            this.setYamlExportVisibility();
-            console.log('Ready to play')
-            this.victoryAllowed = true;
-        } catch (error) {
-            // Fallback vers une grille aléatoire
-            this.generateRandomPuzzle();
+        const { size, gameNumber, difficulty } = this.parseGameId(gameId);
+        const diffSelector = document.getElementById('difficultySelector');
+        if (diffSelector && diffSelector.value !== difficulty) {
+            diffSelector.value = difficulty;
+            this.selectedDifficulty = difficulty;
+            this.updateMenuProgress();
         }
+        const seed = this.generateSeedFromGameNumber(gameId);
+        this.currentGameId = gameId;
+        this.currentSeed = seed;
+        this.gridSize = size;
+        this.currentDifficulty = difficulty;
+        this.mode = 'game'; // Forcer le mode GAME lors du chargement par ID
+        // Pour createZonesForCurrentStates
+        let diffVal = 0;
+        if (difficulty === 'EASY') diffVal = 1;
+        else if (difficulty === 'HARD') diffVal = -1;
+        else if (difficulty === 'HARDER') diffVal = -2;
+        // Mettre à jour l'URL
+        this.updateUrlWithGameId(gameId);
+        // Mettre à jour l'affichage de l'ID
+        this.updateGameIdDisplay();
+        // Générer la grille avec la graine et la difficulté
+        this.generateSeededPuzzle(seed, diffVal);
+        this.setYamlExportVisibility();
+        console.log('Ready to play')
+        this.victoryAllowed = true;
     }
 
     // Met à jour l'URL avec l'ID_JEU
@@ -2749,7 +2742,7 @@ class HexGridGame {
         this.hintMediumList = [];
         this.hintHardList = [];
         constraints.forEach(constraint => {
-            
+
             const actualWhite = parseInt(constraint.dataset.actual_white || '0');
             const actualBlack = parseInt(constraint.dataset.actual_black || '0');
             const expectedBlack = parseInt(constraint.dataset.expected_black || '0');
@@ -3081,26 +3074,30 @@ class HexGridGame {
 window.addEventListener('load', () => {
     const game = new HexGridGame();
     game.populateGridSelector();
-    
+
     // Vérifier s'il y a un ID_JEU dans l'URL
     const gameIdFromUrl = game.getGameIdFromUrl();
-    if (gameIdFromUrl) {
-        console.log(`Chargement de la grille depuis l'URL: ${gameIdFromUrl}`);
-        game.generateGridFromGameId(gameIdFromUrl);
-        game.mode = 'game'; // Forcer le mode GAME lors du chargement initial
-    } else if (window.GRIDS_DEFINITION && window.GRIDS_DEFINITION.length > 0) {
-        game.mode = 'game'; // Forcer le mode GAME lors du chargement initial
-        game.loadGridFromConf(window.GRIDS_DEFINITION[0]);
-        //game.setYamlExportVisibility();
+
+    const grid_def = window.GRIDS_DEFINITION.find(({ name }) => name === gameIdFromUrl);
+
+    game.mode = 'game'; // Forcer le mode GAME lors du chargement initialgame.mode = 'game'; // Forcer le mode GAME lors du chargement initial
+
+    if (grid_def) {
+        game.loadGridFromConf(grid_def);
     } else {
-        game.generateGrid();
+        try {
+            const { size, gameNumber, difficulty } = game.parseGameId(gameIdFromUrl);
+            game.generateGridFromGameId(gameIdFromUrl);
+        } catch {
+            game.generateGrid();
+        }
     }
     // Initialisation des boutons du menu
     game.updateModeButton();
     game.updateAnimationButton(false);
     game.updateGameIdDisplay();
     game.updateMenuProgress();
-    
+
     // Créer un conteneur pour les éléments de jeu en dessous de la grille
     if (!document.getElementById('gameControls')) {
         const gameControls = document.createElement('div');
@@ -3111,7 +3108,7 @@ window.addEventListener('load', () => {
         gameControls.style.display = 'block';
         gameControls.style.width = '100%';
         gameControls.style.clear = 'both';
-        
+
 
         // Insérer le conteneur après le grid-container
         const gridContainer = document.querySelector('.grid-container');
@@ -3132,10 +3129,10 @@ window.addEventListener('load', () => {
         gameIdDisplay.style.fontSize = '14px';
         gameIdDisplay.style.color = '#666';
         gameIdDisplay.style.display = 'inline-block';
-        
-        
+
+
         if (typeof this.setGameUIVisibility === 'function') this.setGameUIVisibility();
 
 
-    }    
-}); 
+    }
+});
