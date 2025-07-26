@@ -1932,7 +1932,6 @@ class HexGridGame {
         //const maxZoneSize = Math.max(2, Math.floor(N / 2)+2);
         // Difficulty EASY+1 , MEDIUM=0, HARD-1
         const maxZoneSize = N + difficulty;
-        console.log("maxZoneSize", maxZoneSize);
         // Génère des zoneId : A, B, ..., Z, AA, AB, ...
         function* zoneIdGenerator() {
             const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -2287,7 +2286,6 @@ class HexGridGame {
         // Générer la grille avec la graine et la difficulté
         this.generateSeededPuzzle(seed, diffVal);
         this.setYamlExportVisibility();
-        console.log('Ready to play')
         this.victoryAllowed = true;
     }
 
@@ -2736,7 +2734,6 @@ class HexGridGame {
         const hintBtn = document.getElementById('hintBtn');
         //if (!hintBtn) return;
         const constraints = Array.from(this.hexGridSvg.querySelectorAll('polygon[data-type="constraint"]'));
-        //console.log(constraints.length)
         let nbHintEasy = 0, nbHintMedium = 0, nbHintHard = 0;
         this.hintEasyList = [];
         this.hintMediumList = [];
