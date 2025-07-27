@@ -222,9 +222,9 @@ class HexGridGame {
                         const x = cx + (w / 2 - 0.5) * Math.cos(angle);
                         const y = cy + (w / 2 - 0.5) * Math.sin(angle);
                         pointsArr.push({x, y});
-                        // Point intérieur à 60% du rayon
-                        const xi = cx + 0.6 * (w / 2 - 0.5) * Math.cos(angle);
-                        const yi = cy + 0.6 * (w / 2 - 0.5) * Math.sin(angle);
+                        // Point intérieur à 80% du rayon pour l'hexagone central
+                        const xi = cx + 0.8 * (w / 2 - 0.5) * Math.cos(angle);
+                        const yi = cy + 0.8 * (w / 2 - 0.5) * Math.sin(angle);
                         pointsInner.push({x: xi, y: yi});
                     }
                     // Couleurs de base selon le type et l'état
@@ -298,30 +298,55 @@ class HexGridGame {
                     }
                     // Création du groupe SVG
                     const hexGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                    // Biseau foncé (côtés 3-4-5)
-                    let darkPath = `${pointsArr[3].x},${pointsArr[3].y} ${pointsArr[4].x},${pointsArr[4].y} ${pointsArr[5].x},${pointsArr[5].y}`;
-                    let darkPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                    darkPoly.setAttribute('points', darkPath);
-                    darkPoly.setAttribute('fill', darkColor);
-                    hexGroup.appendChild(darkPoly);
-                    // Biseau clair (côtés 0-1-2)
-                    let lightPath = `${pointsArr[0].x},${pointsArr[0].y} ${pointsArr[1].x},${pointsArr[1].y} ${pointsArr[2].x},${pointsArr[2].y}`;
-                    let lightPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                    lightPoly.setAttribute('points', lightPath);
-                    lightPoly.setAttribute('fill', lightColor);
-                    hexGroup.appendChild(lightPoly);
-                    // Face principale
+
+                    // 1. Créer les 6 trapèzes (facettes) avec éclairage directionnel
+                    for (let i = 0; i < 6; i++) {
+                        const nextI = (i + 1) % 6;
+                        
+                        // Calculer l'orientation du trapèze par rapport à la lumière (en haut à droite)
+                        // Angle de la lumière : 45° (en haut à droite)
+                        const lightAngle = Math.PI / 4; // 45 degrés
+                        const trapCenterAngle = (Math.PI / 180 * (60 * i - 30) + Math.PI / 180 * (60 * nextI - 30)) / 2;
+                        
+                        // Différence d'angle entre la lumière et le centre du trapèze
+                        let angleDiff = Math.abs(trapCenterAngle - lightAngle);
+                        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                        
+                        // Normaliser l'angle (0 = face à la lumière, π = opposé à la lumière)
+                        const normalizedAngle = angleDiff / Math.PI;
+                        
+                        // Calculer la luminosité basée sur l'orientation
+                        const brightness = 0.3 + 0.7 * (1 - normalizedAngle); // 0.3 à 1.0
+                        
+                        // Couleur basée sur la luminosité
+                        const colorValue = Math.floor(255 * brightness);
+                        const trapColor = `rgb(${colorValue}, ${colorValue}, ${colorValue})`;
+                        
+                        // Trapèze entre les points i et i+1
+                        const trapPath = `${pointsArr[i].x},${pointsArr[i].y} ${pointsArr[nextI].x},${pointsArr[nextI].y} ${pointsInner[nextI].x},${pointsInner[nextI].y} ${pointsInner[i].x},${pointsInner[i].y}`;
+                        
+                        const trapPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                        trapPoly.setAttribute('points', trapPath);
+                        trapPoly.setAttribute('fill', trapColor);
+                        trapPoly.setAttribute('fill-opacity', '0.9');
+                        hexGroup.appendChild(trapPoly);
+                    }
+
+                    // 2. Hexagone central (table de la pierre) avec opacité 0.8
+                    let centerPath = pointsInner.map(p => `${p.x},${p.y}`).join(' ');
+                    let centerPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                    centerPoly.setAttribute('points', centerPath);
+                    centerPoly.setAttribute('fill', 'url(#hexRadialGradient)');
+                    centerPoly.setAttribute('fill-opacity', '0.8');
+                    hexGroup.appendChild(centerPoly);
+
+                    // 3. Face principale (pour les interactions et datasets)
                     let mainPath = pointsArr.map(p => `${p.x},${p.y}`).join(' ');
                     let mainPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
                     mainPoly.setAttribute('points', mainPath);
-                    mainPoly.setAttribute('fill', fillColor);
-                    mainPoly.setAttribute('fill-opacity', '0.85'); // Opacité sur la face principale
-                    // Accentuer le contraste des biseaux
-                    lightColor = '#ffffff';
-                    darkColor = '#888888';
-                    darkPoly.setAttribute('fill', darkColor);
-                    lightPoly.setAttribute('fill', lightColor);
-                    // Copier les attributs et dataset de l'ancien hex sur mainPoly
+                    mainPoly.setAttribute('fill', 'transparent'); // Transparent pour voir les facettes
+                    mainPoly.setAttribute('fill-opacity', '0.65'); // Très transparent
+                    // Ajouter les datasets et attributs nécessaires
                     mainPoly.dataset.row = row;
                     mainPoly.dataset.col = col + Math.floor(offset / 2);
                     mainPoly.dataset.cx = cx;
@@ -1276,9 +1301,9 @@ class HexGridGame {
                     const x = cx + (w / 2 - 0.5) * Math.cos(angle);
                     const y = cy + (w / 2 - 0.5) * Math.sin(angle);
                     pointsArr.push({x, y});
-                    // Point intérieur à 60% du rayon
-                    const xi = cx + 0.6 * (w / 2 - 0.5) * Math.cos(angle);
-                    const yi = cy + 0.6 * (w / 2 - 0.5) * Math.sin(angle);
+                                            // Point intérieur à 80% du rayon pour l'hexagone central
+                        const xi = cx + 0.8 * (w / 2 - 0.5) * Math.cos(angle);
+                        const yi = cy + 0.8 * (w / 2 - 0.5) * Math.sin(angle);
                     pointsInner.push({x: xi, y: yi});
                 }
                 // Couleurs de base selon le type et l'état
@@ -1352,30 +1377,55 @@ class HexGridGame {
                 }
                 // Création du groupe SVG
                 const hexGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                // Biseau foncé (côtés 3-4-5)
-                let darkPath = `${pointsArr[3].x},${pointsArr[3].y} ${pointsArr[4].x},${pointsArr[4].y} ${pointsArr[5].x},${pointsArr[5].y}`;
-                let darkPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                darkPoly.setAttribute('points', darkPath);
-                darkPoly.setAttribute('fill', darkColor);
-                hexGroup.appendChild(darkPoly);
-                // Biseau clair (côtés 0-1-2)
-                let lightPath = `${pointsArr[0].x},${pointsArr[0].y} ${pointsArr[1].x},${pointsArr[1].y} ${pointsArr[2].x},${pointsArr[2].y}`;
-                let lightPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                lightPoly.setAttribute('points', lightPath);
-                lightPoly.setAttribute('fill', lightColor);
-                hexGroup.appendChild(lightPoly);
-                // Face principale
+
+                // 1. Créer les 6 trapèzes (facettes) avec éclairage directionnel
+                for (let i = 0; i < 6; i++) {
+                    const nextI = (i + 1) % 6;
+                    
+                    // Calculer l'orientation du trapèze par rapport à la lumière (en haut à droite)
+                    // Angle de la lumière : 45° (en haut à droite)
+                    const lightAngle = Math.PI / 4; // 45 degrés
+                    const trapCenterAngle = (Math.PI / 180 * (60 * i - 30) + Math.PI / 180 * (60 * nextI - 30)) / 2;
+                    
+                    // Différence d'angle entre la lumière et le centre du trapèze
+                    let angleDiff = Math.abs(trapCenterAngle - lightAngle);
+                    if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                    
+                    // Normaliser l'angle (0 = face à la lumière, π = opposé à la lumière)
+                    const normalizedAngle = angleDiff / Math.PI;
+                    
+                    // Calculer la luminosité basée sur l'orientation
+                    const brightness = 0.3 + 0.7 * (1 - normalizedAngle); // 0.3 à 1.0
+                    
+                    // Couleur basée sur la luminosité
+                    const colorValue = Math.floor(255 * brightness);
+                    const trapColor = `rgb(${colorValue}, ${colorValue}, ${colorValue})`;
+                    
+                    // Trapèze entre les points i et i+1
+                    const trapPath = `${pointsArr[i].x},${pointsArr[i].y} ${pointsArr[nextI].x},${pointsArr[nextI].y} ${pointsInner[nextI].x},${pointsInner[nextI].y} ${pointsInner[i].x},${pointsInner[i].y}`;
+                    
+                    const trapPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                    trapPoly.setAttribute('points', trapPath);
+                    trapPoly.setAttribute('fill', trapColor);
+                    trapPoly.setAttribute('fill-opacity', '0.9');
+                    hexGroup.appendChild(trapPoly);
+                }
+
+                // 2. Hexagone central (table de la pierre) avec opacité 0.8
+                let centerPath = pointsInner.map(p => `${p.x},${p.y}`).join(' ');
+                let centerPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                centerPoly.setAttribute('points', centerPath);
+                centerPoly.setAttribute('fill', 'url(#hexRadialGradient)');
+                centerPoly.setAttribute('fill-opacity', '0.8');
+                hexGroup.appendChild(centerPoly);
+
+                // 3. Face principale (pour les interactions et datasets)
                 let mainPath = pointsArr.map(p => `${p.x},${p.y}`).join(' ');
                 let mainPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
                 mainPoly.setAttribute('points', mainPath);
-                mainPoly.setAttribute('fill', fillColor);
-                mainPoly.setAttribute('fill-opacity', '0.85'); // Opacité sur la face principale
-                // Accentuer le contraste des biseaux
-                lightColor = '#ffffff';
-                darkColor = '#888888';
-                darkPoly.setAttribute('fill', darkColor);
-                lightPoly.setAttribute('fill', lightColor);
-                // Copier les attributs et dataset de l'ancien hex sur mainPoly
+                mainPoly.setAttribute('fill', 'transparent'); // Transparent pour voir les facettes
+                mainPoly.setAttribute('fill-opacity', '0.1'); // Très transparent
+                // Ajouter les datasets et attributs nécessaires
                 mainPoly.dataset.row = row;
                 mainPoly.dataset.col = col + Math.floor(offset / 2);
                 mainPoly.dataset.cx = cx;
