@@ -214,52 +214,134 @@ class HexGridGame {
                     // Coordonnée du centre
                     const cx = leftMargin + col * w + w / 2;
                     const cy = row * w * 0.866 + w / 2;
-                    const polygon = this.createHexPolygon(cx, cy, w / 2 - 0.5);
-                    const hex = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                    hex.setAttribute('points', polygon);
-                    // Déterminer si c'est une cellule de bordure (contrainte) ou de jeu
-                    const isBorderCell = this.isBorderCell(row, col, extendedN, totalRows);
+                    // Récupérer les points de l'hexagone sous forme de tableau de coordonnées
+                    let pointsArr = [];
+                    let pointsInner = [];
+                    for (let i = 0; i < 6; i++) {
+                        const angle = Math.PI / 180 * (60 * i - 30);
+                        const x = cx + (w / 2 - 0.5) * Math.cos(angle);
+                        const y = cy + (w / 2 - 0.5) * Math.sin(angle);
+                        pointsArr.push({x, y});
+                        // Point intérieur à 60% du rayon
+                        const xi = cx + 0.6 * (w / 2 - 0.5) * Math.cos(angle);
+                        const yi = cy + 0.6 * (w / 2 - 0.5) * Math.sin(angle);
+                        pointsInner.push({x: xi, y: yi});
+                    }
+                    // Couleurs de base selon le type et l'état
+                    let baseColor = '#fff';
+                    let lightColor = '#f8f8f8';
+                    let darkColor = '#bbb';
+                    let fillColor = '#fff';
+                    let isBorderCell = this.isBorderCell(row, col, extendedN, totalRows);
                     let isUselessCell = false;
+                    let zoneId = null;
                     if (isBorderCell) {
                         isUselessCell = this.isUselessConstraintCell(row, col, extendedN, totalRows);
                     }
-                    // Calculer les coordonnées (row,col) dans un système rectangulaire complet
-                    const logicalRow = row;
-                    const logicalCol = col + Math.floor(offset / 2);
-                    // Stocker les informations de base
-                    hex.dataset.row = logicalRow;
-                    hex.dataset.col = logicalCol;
-                    hex.dataset.cx = cx;
-                    hex.dataset.cy = cy;
-                    hex.dataset.type = isBorderCell ? (isUselessCell ? 'useless' : 'constraint') : 'game';
-                    if (isBorderCell && isUselessCell) {
-                        hex.setAttribute('fill', '#9b59b6');
-                        hex.setAttribute('stroke', '#8e44ad');
-                        hex.setAttribute('stroke-width', '1');
-                        hex.setAttribute('pointer-events', 'none');
-                    } else if (isBorderCell) {
-                        hex.dataset.state = 0; // GRIS
-                        hex.setAttribute('fill', '#b2bec3');
-                        hex.setAttribute('stroke', '#b2bec3');
-                        hex.setAttribute('stroke-width', '1');
-                    } else {
-                        hex.setAttribute('cursor', 'pointer');
-                        hex.dataset.hexNumber = hexNumber;
-                        if (this.mode === 'edit') {
-                            hex.dataset.state = 2; // BLANC
-                            hex.setAttribute('fill', '#fff');
-                            delete hex.dataset.zoneId;
-                        } else {
-                            hex.dataset.state = 0; // GRIS
-                            const zoneColor = hex.dataset.zoneId ? this.getZoneColor(hex.dataset.zoneId) : '#b2bec3';
-                            hex.setAttribute('fill', zoneColor);
-                        }
-                        hex.setAttribute('stroke', 'none');
-                        hex.setAttribute('stroke-width', '0');
-                        hexNumber++;
+                    if (!isBorderCell && this.mode !== 'edit') {
+                        // Essayer de retrouver la zoneId si une structure de zones existe (à adapter si besoin)
+                        // Par défaut, on laisse zoneId à null
+                        // Si tu as une structure this.zones ou similaire, tu peux faire :
+                        // zoneId = this.getZoneIdForCell(row, col); // à adapter
                     }
-                    hexCells.push(hex);
-                    svg.appendChild(hex);
+                    if (isBorderCell && isUselessCell) {
+                        baseColor = '#9b59b6';
+                        lightColor = '#b084cc';
+                        darkColor = '#7c4792';
+                        fillColor = baseColor;
+                    } else if (isBorderCell) {
+                        baseColor = '#b2bec3';
+                        lightColor = '#dfe6e9';
+                        darkColor = '#636e72';
+                        fillColor = baseColor;
+                    } else {
+                        // Cellule de jeu
+                        if (this.mode === 'edit') {
+                            baseColor = '#fff';
+                            lightColor = '#f8f8f8';
+                            darkColor = '#bbb';
+                            fillColor = baseColor;
+                        } else {
+                            // GRIS par défaut, sinon couleur de zone
+                            baseColor = '#b2bec3';
+                            lightColor = '#dfe6e9';
+                            darkColor = '#636e72';
+                            fillColor = baseColor;
+                            // Si la cellule a une couleur de zone
+                            if (zoneId) {
+                                fillColor = this.getZoneColor(zoneId);
+                                baseColor = fillColor;
+                                function lighten(color, percent) {
+                                    let num = parseInt(color.replace('#',''),16), amt = Math.round(2.55 * percent),
+                                        R = (num >> 16) + amt, G = (num >> 8 & 0x00FF) + amt, B = (num & 0x0000FF) + amt;
+                                    return '#' + (
+                                        0x1000000 +
+                                        (R<255?R<1?0:R:255)*0x10000 +
+                                        (G<255?G<1?0:G:255)*0x100 +
+                                        (B<255?B<1?0:B:255)
+                                    ).toString(16).slice(1);
+                                }
+                                function darken(color, percent) {
+                                    let num = parseInt(color.replace('#',''),16), amt = Math.round(2.55 * percent),
+                                        R = (num >> 16) - amt, G = (num >> 8 & 0x00FF) - amt, B = (num & 0x0000FF) - amt;
+                                    return '#' + (
+                                        0x1000000 +
+                                        (R<255?R<1?0:R:255)*0x10000 +
+                                        (G<255?G<1?0:G:255)*0x100 +
+                                        (B<255?B<1?0:B:255)
+                                    ).toString(16).slice(1);
+                                }
+                                lightColor = lighten(baseColor, 18);
+                                darkColor = darken(baseColor, 18);
+                            }
+                        }
+                    }
+                    // Création du groupe SVG
+                    const hexGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    // Biseau foncé (côtés 3-4-5)
+                    let darkPath = `${pointsArr[3].x},${pointsArr[3].y} ${pointsArr[4].x},${pointsArr[4].y} ${pointsArr[5].x},${pointsArr[5].y}`;
+                    let darkPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                    darkPoly.setAttribute('points', darkPath);
+                    darkPoly.setAttribute('fill', darkColor);
+                    hexGroup.appendChild(darkPoly);
+                    // Biseau clair (côtés 0-1-2)
+                    let lightPath = `${pointsArr[0].x},${pointsArr[0].y} ${pointsArr[1].x},${pointsArr[1].y} ${pointsArr[2].x},${pointsArr[2].y}`;
+                    let lightPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                    lightPoly.setAttribute('points', lightPath);
+                    lightPoly.setAttribute('fill', lightColor);
+                    hexGroup.appendChild(lightPoly);
+                    // Face principale
+                    let mainPath = pointsArr.map(p => `${p.x},${p.y}`).join(' ');
+                    let mainPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                    mainPoly.setAttribute('points', mainPath);
+                    mainPoly.setAttribute('fill', fillColor);
+                    mainPoly.setAttribute('fill-opacity', '0.85'); // Opacité sur la face principale
+                    // Accentuer le contraste des biseaux
+                    lightColor = '#ffffff';
+                    darkColor = '#888888';
+                    darkPoly.setAttribute('fill', darkColor);
+                    lightPoly.setAttribute('fill', lightColor);
+                    // Copier les attributs et dataset de l'ancien hex sur mainPoly
+                    mainPoly.dataset.row = row;
+                    mainPoly.dataset.col = col + Math.floor(offset / 2);
+                    mainPoly.dataset.cx = cx;
+                    mainPoly.dataset.cy = cy;
+                    mainPoly.dataset.type = isBorderCell ? (isUselessCell ? 'useless' : 'constraint') : 'game';
+                    if (isBorderCell && isUselessCell) {
+                        // rien de plus
+                    } else if (isBorderCell) {
+                        mainPoly.dataset.state = 0; // GRIS
+                    } else {
+                        mainPoly.dataset.hexNumber = hexNumber;
+                        if (this.mode === 'edit') {
+                            mainPoly.dataset.state = 2; // BLANC
+                        } else {
+                            mainPoly.dataset.state = 0; // GRIS
+                        }
+                    }
+                    hexGroup.appendChild(mainPoly);
+                    hexCells.push(mainPoly);
+                    svg.appendChild(hexGroup);
                 }
             }
 
@@ -1186,49 +1268,134 @@ class HexGridGame {
             for (let col = 0; col < hexesInRow; col++) {
                 const cx = leftMargin + col * w + w / 2;
                 const cy = row * w * 0.866 + w / 2;
-                const polygon = this.createHexPolygon(cx, cy, w / 2 - 0.5);
-                const hex = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                hex.setAttribute('points', polygon);
-                const isBorderCell = this.isBorderCell(row, col, extendedN, totalRows);
+                // Récupérer les points de l'hexagone sous forme de tableau de coordonnées
+                let pointsArr = [];
+                let pointsInner = [];
+                for (let i = 0; i < 6; i++) {
+                    const angle = Math.PI / 180 * (60 * i - 30);
+                    const x = cx + (w / 2 - 0.5) * Math.cos(angle);
+                    const y = cy + (w / 2 - 0.5) * Math.sin(angle);
+                    pointsArr.push({x, y});
+                    // Point intérieur à 60% du rayon
+                    const xi = cx + 0.6 * (w / 2 - 0.5) * Math.cos(angle);
+                    const yi = cy + 0.6 * (w / 2 - 0.5) * Math.sin(angle);
+                    pointsInner.push({x: xi, y: yi});
+                }
+                // Couleurs de base selon le type et l'état
+                let baseColor = '#fff';
+                let lightColor = '#f8f8f8';
+                let darkColor = '#bbb';
+                let fillColor = '#fff';
+                let isBorderCell = this.isBorderCell(row, col, extendedN, totalRows);
                 let isUselessCell = false;
+                let zoneId = null;
                 if (isBorderCell) {
                     isUselessCell = this.isUselessConstraintCell(row, col, extendedN, totalRows);
                 }
-                const logicalRow = row;
-                const logicalCol = col + Math.floor(offset / 2);
-                hex.dataset.row = logicalRow;
-                hex.dataset.col = logicalCol;
-                hex.dataset.cx = cx;
-                hex.dataset.cy = cy;
-                hex.dataset.type = isBorderCell ? (isUselessCell ? 'useless' : 'constraint') : 'game';
-                if (isBorderCell && isUselessCell) {
-                    hex.setAttribute('fill', '#9b59b6');
-                    hex.setAttribute('stroke', '#8e44ad');
-                    hex.setAttribute('stroke-width', '1');
-                    hex.setAttribute('pointer-events', 'none');
-                } else if (isBorderCell) {
-                    hex.dataset.state = 0; // GRIS
-                    hex.setAttribute('fill', '#b2bec3');
-                    hex.setAttribute('stroke', '#b2bec3');
-                    hex.setAttribute('stroke-width', '1');
-                } else {
-                    hex.setAttribute('cursor', 'pointer');
-                    hex.dataset.hexNumber = hexNumber;
-                    if (this.mode === 'edit') {
-                        hex.dataset.state = 2; // BLANC
-                        hex.setAttribute('fill', '#fff');
-                        delete hex.dataset.zoneId;
-                    } else {
-                        hex.dataset.state = 0; // GRIS
-                        const zoneColor = hex.dataset.zoneId ? this.getZoneColor(hex.dataset.zoneId) : '#b2bec3';
-                        hex.setAttribute('fill', zoneColor);
-                    }
-                    hex.setAttribute('stroke', 'none');
-                    hex.setAttribute('stroke-width', '0');
-                    hexNumber++;
+                if (!isBorderCell && this.mode !== 'edit') {
+                    // Essayer de retrouver la zoneId si une structure de zones existe (à adapter si besoin)
+                    // Par défaut, on laisse zoneId à null
+                    // Si tu as une structure this.zones ou similaire, tu peux faire :
+                    // zoneId = this.getZoneIdForCell(row, col); // à adapter
                 }
-                hexCells.push(hex);
-                svg.appendChild(hex);
+                if (isBorderCell && isUselessCell) {
+                    baseColor = '#9b59b6';
+                    lightColor = '#b084cc';
+                    darkColor = '#7c4792';
+                    fillColor = baseColor;
+                } else if (isBorderCell) {
+                    baseColor = '#b2bec3';
+                    lightColor = '#dfe6e9';
+                    darkColor = '#636e72';
+                    fillColor = baseColor;
+                } else {
+                    // Cellule de jeu
+                    if (this.mode === 'edit') {
+                        baseColor = '#fff';
+                        lightColor = '#f8f8f8';
+                        darkColor = '#bbb';
+                        fillColor = baseColor;
+                    } else {
+                        // GRIS par défaut, sinon couleur de zone
+                        baseColor = '#b2bec3';
+                        lightColor = '#dfe6e9';
+                        darkColor = '#636e72';
+                        fillColor = baseColor;
+                        // Si la cellule a une couleur de zone
+                        if (zoneId) {
+                            fillColor = this.getZoneColor(zoneId);
+                            baseColor = fillColor;
+                            function lighten(color, percent) {
+                                let num = parseInt(color.replace('#',''),16), amt = Math.round(2.55 * percent),
+                                    R = (num >> 16) + amt, G = (num >> 8 & 0x00FF) + amt, B = (num & 0x0000FF) + amt;
+                                return '#' + (
+                                    0x1000000 +
+                                    (R<255?R<1?0:R:255)*0x10000 +
+                                    (G<255?G<1?0:G:255)*0x100 +
+                                    (B<255?B<1?0:B:255)
+                                ).toString(16).slice(1);
+                            }
+                            function darken(color, percent) {
+                                let num = parseInt(color.replace('#',''),16), amt = Math.round(2.55 * percent),
+                                    R = (num >> 16) - amt, G = (num >> 8 & 0x00FF) - amt, B = (num & 0x0000FF) - amt;
+                                return '#' + (
+                                    0x1000000 +
+                                    (R<255?R<1?0:R:255)*0x10000 +
+                                    (G<255?G<1?0:G:255)*0x100 +
+                                    (B<255?B<1?0:B:255)
+                                ).toString(16).slice(1);
+                            }
+                            lightColor = lighten(baseColor, 18);
+                            darkColor = darken(baseColor, 18);
+                        }
+                    }
+                }
+                // Création du groupe SVG
+                const hexGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                // Biseau foncé (côtés 3-4-5)
+                let darkPath = `${pointsArr[3].x},${pointsArr[3].y} ${pointsArr[4].x},${pointsArr[4].y} ${pointsArr[5].x},${pointsArr[5].y}`;
+                let darkPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                darkPoly.setAttribute('points', darkPath);
+                darkPoly.setAttribute('fill', darkColor);
+                hexGroup.appendChild(darkPoly);
+                // Biseau clair (côtés 0-1-2)
+                let lightPath = `${pointsArr[0].x},${pointsArr[0].y} ${pointsArr[1].x},${pointsArr[1].y} ${pointsArr[2].x},${pointsArr[2].y}`;
+                let lightPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                lightPoly.setAttribute('points', lightPath);
+                lightPoly.setAttribute('fill', lightColor);
+                hexGroup.appendChild(lightPoly);
+                // Face principale
+                let mainPath = pointsArr.map(p => `${p.x},${p.y}`).join(' ');
+                let mainPoly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                mainPoly.setAttribute('points', mainPath);
+                mainPoly.setAttribute('fill', fillColor);
+                mainPoly.setAttribute('fill-opacity', '0.85'); // Opacité sur la face principale
+                // Accentuer le contraste des biseaux
+                lightColor = '#ffffff';
+                darkColor = '#888888';
+                darkPoly.setAttribute('fill', darkColor);
+                lightPoly.setAttribute('fill', lightColor);
+                // Copier les attributs et dataset de l'ancien hex sur mainPoly
+                mainPoly.dataset.row = row;
+                mainPoly.dataset.col = col + Math.floor(offset / 2);
+                mainPoly.dataset.cx = cx;
+                mainPoly.dataset.cy = cy;
+                mainPoly.dataset.type = isBorderCell ? (isUselessCell ? 'useless' : 'constraint') : 'game';
+                if (isBorderCell && isUselessCell) {
+                    // rien de plus
+                } else if (isBorderCell) {
+                    mainPoly.dataset.state = 0; // GRIS
+                } else {
+                    mainPoly.dataset.hexNumber = hexNumber;
+                    if (this.mode === 'edit') {
+                        mainPoly.dataset.state = 2; // BLANC
+                    } else {
+                        mainPoly.dataset.state = 0; // GRIS
+                    }
+                }
+                hexGroup.appendChild(mainPoly);
+                hexCells.push(mainPoly);
+                svg.appendChild(hexGroup);
             }
         }
         // --- Affectation séquentielle des zoneId à partir de textual_zones ---
