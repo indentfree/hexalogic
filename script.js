@@ -2246,7 +2246,7 @@ class HexGridGame {
         let difficulty = 'MEDIUM';
         if (match[3]) {
             const d = match[3].toUpperCase();
-            if (["EASY","MEDIUM","HARD","HARDER"].includes(d)) difficulty = d;
+            if (Object.keys(DIFFICULTIES).includes(d)) difficulty = d;
         }
         return {
             size: parseInt(match[1]),
@@ -2276,9 +2276,13 @@ class HexGridGame {
         this.mode = 'game'; // Forcer le mode GAME lors du chargement par ID
         // Pour createZonesForCurrentStates
         let diffVal = 0;
-        if (difficulty === 'EASY') diffVal = 1;
-        else if (difficulty === 'HARD') diffVal = -1;
-        else if (difficulty === 'HARDER') diffVal = -2;
+        
+        try {
+            diffVal=DIFFICULTIES[difficulty]
+        } catch(e) {
+            diffVal=0
+        }
+
         // Mettre à jour l'URL
         this.updateUrlWithGameId(gameId);
         // Mettre à jour l'affichage de l'ID
@@ -2332,7 +2336,7 @@ class HexGridGame {
             diffSelector.className = 'menu-select'; // même style que gridSelector
             diffSelector.style.margin = '8px 0 16px 0';
             diffSelector.style.fontSize = '1em';
-            ['EASY','MEDIUM','HARD','HARDER'].forEach(d => {
+            Object.keys(DIFFICULTIES).forEach(d => {
                 const opt = document.createElement('option');
                 opt.value = d;
                 opt.textContent = d.charAt(0) + d.slice(1).toLowerCase();
@@ -2340,7 +2344,7 @@ class HexGridGame {
             });
             // Charger la difficulté depuis le localStorage si dispo
             const savedDiff = localStorage.getItem('hexalogic_selected_difficulty');
-            if (savedDiff && ['EASY','MEDIUM','HARD','HARDER'].includes(savedDiff)) diffSelector.value = savedDiff;
+            if (savedDiff && Object.keys(DIFFICULTIES).includes(savedDiff)) diffSelector.value = savedDiff;
             // Ajouter dans la première section du menu hamburger
             const menuSections = document.querySelectorAll('.menu-section');
             if (menuSections.length > 0) {
@@ -2576,15 +2580,15 @@ class HexGridGame {
     updateMenuProgress() {
         const sizes = [3, 4, 5, 6, 7, 8, 9];
         // Utiliser la difficulté sélectionnée
-        let difficulty = this.selectedDifficulty || 'MEDIUM';
-        const difficulties = ['EASY','MEDIUM','HARD','HARDER'];
+        let difficulty = this.selectedDifficulty || 'NORMAL';
+        const difficulties = Object.keys(DIFFICULTIES);
         sizes.forEach(size => {
             const btn = document.querySelector(`[data-action="grid"][data-size="${size}"]`);
             if (btn) {
                 const key = `hexalogic_completed_${size}_${difficulty}`;
                 const lastCompleted = this.getLastCompletedLevel(size, difficulty);
                 const nextLevel = lastCompleted + 1;
-                btn.textContent = `Grille d'ordre ${size} (${difficulty}) (Niveau ${nextLevel})`;
+                btn.textContent = `Grille d'ordre ${size} (Niveau ${nextLevel})`;
                 if (lastCompleted > 0) {
                     btn.style.background = '#e8f5e8';
                     btn.style.borderColor = '#28a745';

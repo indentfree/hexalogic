@@ -1,4 +1,12 @@
 // hexgrid.conf.js
+window.DIFFICULTIES = {
+  "EASY" : 1,
+  "NORMAL" : 0,
+  "HARD" : -1,
+  "HARDER" : -2,
+  "INSANE" : -3,
+  "DEMON" : -4
+}
 
 window.GRIDS_DEFINITION = [
   {
